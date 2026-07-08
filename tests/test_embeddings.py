@@ -7,6 +7,11 @@ def test_cosine_drift_first_is_zero():
     assert math.isclose(d[1], 0.0, abs_tol=1e-9)
     assert math.isclose(d[2], 1.0, abs_tol=1e-9)  # orthogonal → distance 1
 
+def test_cosine_drift_zero_first_vector():
+    # first vector is zero-norm; distance-to-self must still be 0.0
+    d = cosine_drift([[0.0, 0.0], [1.0, 0.0]])
+    assert d[0] == 0.0
+
 def test_norm_trajectory():
     n = norm_trajectory([[3.0, 4.0], [0.0, 0.0]])
     assert math.isclose(n[0], 5.0)

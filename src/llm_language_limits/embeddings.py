@@ -13,6 +13,9 @@ def cosine_drift(vectors: list[list[float]]) -> list[float]:
         vn = np.linalg.norm(v) or 1.0
         cos = float(np.dot(ref, v) / (ref_norm * vn))
         out.append(1.0 - cos)
+    # Guarantee the first element is 0.0 (distance-to-self is 0 by definition)
+    if out:
+        out[0] = 0.0
     return out
 
 
