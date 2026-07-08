@@ -22,10 +22,14 @@ def main():
     args = ap.parse_args()
     specs = models_for("full")
     stimuli = load_stimuli(HERE / "stimuli.yaml")
-    n_calls = len(specs) * len(stimuli) * len(DEFAULT_N_GRID) * 2 * REPLICATES
+    # Calls per (spec, stimulus): single = 1 call per N; multi = min(N, cap) calls per N.
+    from llm_language_limits.config import MULTITURN_DEFAULT_CAP, Provider
+    calls_per_stim = sum(1 + min(n, MULTITURN_DEFAULT_CAP) for n in DEFAULT_N_GRID)
+    calls_per_spec = len(stimuli) * calls_per_stim * REPLICATES
     for s in specs:
-        print_estimate(s.label, n_calls // len(specs), avg_in=400, avg_out=150)
-    from llm_language_limits.config import Provider
+        print_estimate(s.label, calls_per_spec, avg_in=400, avg_out=150)
+    print(f"[estimate] ~{calls_per_spec * len(specs)} total API calls; APPROXIMATE — "
+          f"multi-turn late turns carry far more input than avg_in, so treat as a lower bound.")
     if any(s.provider is Provider.MODAL for s in specs):
         print("[warn] Modal (open) models bill by GPU-hour and are NOT included in the "
               "$ estimate above — budget A10G (7B) / 2xA100-80GB (72B) separately.")
