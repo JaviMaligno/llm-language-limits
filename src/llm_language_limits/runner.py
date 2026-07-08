@@ -1,8 +1,9 @@
 # src/llm_language_limits/runner.py
 from __future__ import annotations
+import concurrent.futures
 import time
 from typing import Callable
-from .config import ModelSpec, SYSTEM_PROMPT
+from .config import DEFAULT_MAX_WORKERS, ModelSpec, SYSTEM_PROMPT
 from .stimuli import Stimulus
 from .prompts import build_single_turn, build_multi_turn
 from .clients.base import ModelClient
@@ -76,10 +77,16 @@ def _run_cell_with_retry(client, judge_client, spec, stimulus, n, mode, replicat
 def run_matrix(client_factory: Callable[[ModelSpec], ModelClient],
                judge_client: ModelClient, specs: list[ModelSpec],
                stimuli: list[Stimulus], n_grid: list[int], modes: list[str],
-               replicates: int, out_path, *, resume: bool = True) -> None:
+               replicates: int, out_path, *, resume: bool = True,
+               max_workers: int = DEFAULT_MAX_WORKERS) -> None:
     done = {record_key(r) for r in read_records(out_path)} if resume else set()
+
+    # One client per spec, reused across all of that spec's cells (SDK clients
+    # are thread-safe, so sharing across worker threads is safe).
+    clients = {spec.label: client_factory(spec) for spec in specs}
+
+    pending: list[tuple] = []
     for spec in specs:
-        client = client_factory(spec)
         for stim in stimuli:
             for n in n_grid:
                 for mode in modes:
@@ -87,6 +94,18 @@ def run_matrix(client_factory: Callable[[ModelSpec], ModelClient],
                         key = (spec.label, stim.category, n, mode, rep)
                         if key in done:
                             continue
-                        rec = _run_cell_with_retry(client, judge_client, spec, stim, n, mode, rep)
-                        if rec is not None:
-                            append_record(out_path, rec)
+                        pending.append((spec, stim, n, mode, rep))
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = [
+            pool.submit(_run_cell_with_retry, clients[spec.label], judge_client,
+                       spec, stim, n, mode, rep)
+            for spec, stim, n, mode, rep in pending
+        ]
+        # Results are only ever written from this (main) thread, so appends to
+        # the JSONL file stay serialized and the file never gets corrupted by
+        # interleaved writes from worker threads.
+        for future in concurrent.futures.as_completed(futures):
+            rec = future.result()
+            if rec is not None:
+                append_record(out_path, rec)

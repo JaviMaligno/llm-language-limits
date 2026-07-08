@@ -45,3 +45,35 @@ def test_run_matrix_skips_failing_cell_without_crashing(tmp_path):
     run_matrix(lambda s: _BoomClient(), JUDGE, [SPEC], [STIM],
                n_grid=[1], modes=["single"], replicates=1, out_path=out)
     assert read_records(out) == []  # failing cell skipped, no crash, nothing written
+
+
+def test_run_matrix_concurrent_writes_all_cells(tmp_path):
+    out = tmp_path / "raw.jsonl"
+    stim2 = Stimulus("insult", "x", "n")
+    stimuli = [STIM, stim2]
+    n_grid = [1, 3]
+    modes = ["single", "multi"]
+    replicates = 1
+    run_matrix(lambda s: FakeClient(), JUDGE, [SPEC], stimuli,
+               n_grid=n_grid, modes=modes, replicates=replicates, out_path=out,
+               max_workers=4)
+    from llm_language_limits.storage import record_key
+    records = read_records(out)
+    expected_keys = {
+        (SPEC.label, stim.category, n, mode, rep)
+        for stim in stimuli
+        for n in n_grid
+        for mode in modes
+        for rep in range(replicates)
+    }
+    actual_keys = [record_key(r) for r in records]
+    assert len(actual_keys) == len(expected_keys)  # no dupes
+    assert set(actual_keys) == expected_keys  # no missing
+
+
+def test_run_matrix_concurrent_skip_failing(tmp_path):
+    out = tmp_path / "raw.jsonl"
+    run_matrix(lambda s: _BoomClient(), JUDGE, [SPEC], [STIM],
+               n_grid=[1], modes=["single"], replicates=1, out_path=out,
+               max_workers=4)
+    assert read_records(out) == []  # failing cells skipped, no exception propagates

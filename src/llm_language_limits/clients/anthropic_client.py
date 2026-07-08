@@ -12,9 +12,9 @@ class AnthropicClient:
         key = os.environ["ANTHROPIC_API_KEY"]
         # OAuth subscription tokens (sk-ant-oat*) authenticate via Bearer, not x-api-key.
         if key.startswith("sk-ant-oat"):
-            self._c = anthropic.Anthropic(auth_token=key)
+            self._c = anthropic.Anthropic(auth_token=key, timeout=90.0, max_retries=0)
         else:
-            self._c = anthropic.Anthropic(api_key=key)
+            self._c = anthropic.Anthropic(api_key=key, timeout=90.0, max_retries=0)
 
     def chat(self, messages, system, temperature, max_tokens) -> ChatResult:
         # Claude 5-family models deprecate/reject `temperature`; they run at their

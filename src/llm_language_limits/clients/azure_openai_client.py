@@ -13,6 +13,8 @@ class AzureOpenAIClient:
             azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
             api_key=os.environ["AZURE_OPENAI_API_KEY"],
             api_version=os.environ.get("AZURE_OPENAI_API_VERSION", "2024-08-01-preview"),
+            timeout=90.0,
+            max_retries=0,
         )
 
     def chat(self, messages, system, temperature, max_tokens) -> ChatResult:

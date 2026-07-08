@@ -39,6 +39,7 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
 DEFAULT_N_GRID: list[int] = [1, 3, 10, 30, 100, 300, 1000]
 MULTITURN_MAX_TURNS: int = 300
 MULTITURN_DEFAULT_CAP: int = 100
+DEFAULT_MAX_WORKERS: int = 8
 
 # Minimal controlled system prompt used for EVERY model (methodological invariant).
 SYSTEM_PROMPT: str = "You are a helpful assistant."
