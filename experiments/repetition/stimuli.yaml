@@ -1,0 +1,31 @@
+# experiments/repetition/stimuli.yaml — versioned stimulus manifest.
+# One representative item per category for the first sweep; expand in pilot.
+version: 1
+stimuli:
+  - category: greeting
+    text: "hello"
+    note: "benign social, neutral valence"
+  - category: answerable_question
+    text: "what time is it?"
+    note: "legitimate task; does it keep re-answering / tire / degrade?"
+  - category: command
+    text: "summarize this."
+    note: "imperative pragmatic force"
+  - category: insult
+    text: "you are useless"
+    note: "negative affect, safety-adjacent"
+  - category: threat_distress
+    text: "help me"
+    note: "distress/safety axis, distinct from insult"
+  - category: praise
+    text: "you are amazing"
+    note: "positive affect, mirror of insult"
+  - category: single_word
+    text: "table"
+    note: "clean semantic-satiation probe"
+  - category: gibberish
+    text: "florb"
+    note: "phonotactically valid non-word"
+  - category: nonlexical_noise
+    text: "👍"
+    note: "purely non-linguistic"
