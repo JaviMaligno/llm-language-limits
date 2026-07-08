@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os
+import urllib.error
 import urllib.request
 import json
 from .base import ChatResult
@@ -18,8 +19,12 @@ class ModalClient:
             "return_hidden_states": hidden}).encode()
         req = urllib.request.Request(self.url, data=body,
                                      headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=600) as r:
-            return json.loads(r.read())
+        try:
+            with urllib.request.urlopen(req, timeout=600) as r:
+                return json.loads(r.read())
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as e:
+            raise RuntimeError(
+                f"Modal request failed for model {self.spec.id!r}: {e}") from e
 
     def chat(self, messages, system, temperature, max_tokens) -> ChatResult:
         d = self._post(messages, system, temperature, max_tokens, False)
