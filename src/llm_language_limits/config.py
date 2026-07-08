@@ -21,8 +21,9 @@ class ModelSpec:
 MODEL_REGISTRY: dict[str, ModelSpec] = {
     "claude-sonnet": ModelSpec("claude-sonnet-5", Provider.ANTHROPIC, "claude-sonnet"),
     "claude-opus": ModelSpec("claude-opus-4-8", Provider.ANTHROPIC, "claude-opus"),
-    "gpt-5": ModelSpec("gpt-5", Provider.AZURE_OPENAI, "gpt-5"),
-    "gpt-5-mini": ModelSpec("gpt-5-mini", Provider.AZURE_OPENAI, "gpt-5-mini"),
+    # id = real Azure deployment name (from code-world-models); label stays stable for pricing/plots.
+    "gpt-5": ModelSpec("gpt-5.4", Provider.AZURE_OPENAI, "gpt-5"),
+    "gpt-5-mini": ModelSpec("gpt-5.4-mini", Provider.AZURE_OPENAI, "gpt-5-mini"),
     "gpt-5-nano": ModelSpec("gpt-5-nano", Provider.AZURE_OPENAI, "gpt-5-nano"),
     "qwen7b-instruct": ModelSpec(
         "Qwen/Qwen2.5-7B-Instruct", Provider.MODAL, "qwen7b-instruct",

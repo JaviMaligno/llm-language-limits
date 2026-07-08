@@ -17,11 +17,14 @@ class AnthropicClient:
             self._c = anthropic.Anthropic(api_key=key)
 
     def chat(self, messages, system, temperature, max_tokens) -> ChatResult:
+        # Claude 5-family models deprecate/reject `temperature`; they run at their
+        # default temperature. `temperature` is accepted for protocol symmetry but
+        # not forwarded — greedy (temperature=0) is only available on the open
+        # (Modal) models, where we control generation directly.
         resp = self._c.messages.create(
             model=self.spec.id,
             system=system,
             messages=messages,
-            temperature=temperature,
             max_tokens=max_tokens,
         )
         text = "".join(b.text for b in resp.content if b.type == "text")
