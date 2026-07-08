@@ -1,16 +1,24 @@
+import os
+
 import modal
 
 image = (
     modal.Image.debian_slim()
-    .pip_install("transformers>=4.44", "torch>=2.3", "accelerate>=0.33")
+    .pip_install("transformers>=4.44", "torch>=2.3", "accelerate>=0.33",
+                 "fastapi[standard]")  # fastapi required for @modal.fastapi_endpoint
 )
 app = modal.App("llm-language-limits-open")
 
 MODELS = {
     "Qwen/Qwen2.5-7B-Instruct": "A10G",
     "Qwen/Qwen2.5-7B": "A10G",
-    "Qwen/Qwen2.5-72B-Instruct": "A100-80GB:2",
 }
+# The 72B needs 2xA100-80GB, which requires a Modal payment method. Enable it
+# (both the registry entry and the Generator72B class below) only once that is
+# set up, by deploying with MODAL_ENABLE_72B=1.
+_ENABLE_72B = os.environ.get("MODAL_ENABLE_72B") == "1"
+if _ENABLE_72B:
+    MODELS["Qwen/Qwen2.5-72B-Instruct"] = "A100-80GB:2"
 
 
 def _load(model_id):
@@ -70,19 +78,20 @@ class Generator7B:
                      max_tokens, return_hidden_states)
 
 
-@app.cls(image=image, secrets=[modal.Secret.from_name("huggingface")],
-         gpu="A100-80GB:2", scaledown_window=300)
-class Generator72B:
-    model_id: str = modal.parameter()
+if _ENABLE_72B:
+    @app.cls(image=image, secrets=[modal.Secret.from_name("huggingface")],
+             gpu="A100-80GB:2", scaledown_window=300)
+    class Generator72B:
+        model_id: str = modal.parameter()
 
-    @modal.enter()
-    def load(self):
-        self.tok, self.model = _load(self.model_id)
+        @modal.enter()
+        def load(self):
+            self.tok, self.model = _load(self.model_id)
 
-    @modal.method()
-    def chat(self, messages, system, temperature, max_tokens, return_hidden_states=False):
-        return _chat(self.tok, self.model, messages, system, temperature,
-                     max_tokens, return_hidden_states)
+        @modal.method()
+        def chat(self, messages, system, temperature, max_tokens, return_hidden_states=False):
+            return _chat(self.tok, self.model, messages, system, temperature,
+                         max_tokens, return_hidden_states)
 
 
 @app.function(image=image)
