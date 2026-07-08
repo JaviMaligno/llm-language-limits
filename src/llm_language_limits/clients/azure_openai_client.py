@@ -20,8 +20,13 @@ class AzureOpenAIClient:
         kwargs = {"model": self.spec.id, "messages": full}
         if self.spec.id.startswith("gpt-5"):
             # GPT-5 reasoning models: use max_completion_tokens and only the
-            # default temperature (they reject a custom temperature).
+            # default temperature (they reject a custom temperature). Set
+            # reasoning_effort="minimal" so the model emits a visible assistant
+            # reply instead of spending the whole token budget on hidden
+            # reasoning — this study measures the visible RESPONSE to repetition,
+            # not the reasoning trace.
             kwargs["max_completion_tokens"] = max_tokens
+            kwargs["reasoning_effort"] = "minimal"
         else:
             kwargs["max_tokens"] = max_tokens
             kwargs["temperature"] = temperature
