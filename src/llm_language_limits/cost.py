@@ -12,9 +12,9 @@ PRICES: dict[str, tuple[float, float]] = {
 
 
 def _price_for(label: str) -> tuple[float, float]:
-    for prefix, price in PRICES.items():
+    for prefix in sorted(PRICES, key=len, reverse=True):
         if label.startswith(prefix):
-            return price
+            return PRICES[prefix]
     return (0.0, 0.0)
 
 

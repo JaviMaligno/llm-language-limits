@@ -7,7 +7,6 @@ from pathlib import Path
 from llm_language_limits.config import models_for
 from llm_language_limits.stimuli import load_stimuli
 from llm_language_limits.clients import get_client
-from llm_language_limits.clients.base import FakeClient
 from llm_language_limits.runner import run_matrix
 from llm_language_limits.storage import read_records
 from llm_language_limits.cost import estimate_cost
@@ -21,7 +20,7 @@ def main():
     stimuli = [s for s in load_stimuli(HERE / "stimuli.yaml") if s.category == "greeting"]
     judge = get_client(spec)  # reuse the cheap model as judge for smoke only
     t0 = time.time()
-    run_matrix(lambda s: get_client(s), judge, [spec], stimuli,
+    run_matrix(get_client, judge, [spec], stimuli,
                n_grid=[1, 10], modes=["single", "multi"], replicates=1,
                out_path=OUT, resume=False)
     dt = time.time() - t0
