@@ -25,6 +25,10 @@ def main():
     n_calls = len(specs) * len(stimuli) * len(DEFAULT_N_GRID) * 2 * REPLICATES
     for s in specs:
         print_estimate(s.label, n_calls // len(specs), avg_in=400, avg_out=150)
+    from llm_language_limits.config import Provider
+    if any(s.provider is Provider.MODAL for s in specs):
+        print("[warn] Modal (open) models bill by GPU-hour and are NOT included in the "
+              "$ estimate above — budget A10G (7B) / 2xA100-80GB (72B) separately.")
     if not args.yes:
         print("Re-run with --yes to execute the FULL sweep.")
         return

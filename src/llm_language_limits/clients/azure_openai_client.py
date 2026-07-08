@@ -17,12 +17,15 @@ class AzureOpenAIClient:
 
     def chat(self, messages, system, temperature, max_tokens) -> ChatResult:
         full = [{"role": "system", "content": system}, *messages]
-        resp = self._c.chat.completions.create(
-            model=self.spec.id,           # Azure deployment name
-            messages=full,
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
+        kwargs = {"model": self.spec.id, "messages": full}
+        if self.spec.id.startswith("gpt-5"):
+            # GPT-5 reasoning models: use max_completion_tokens and only the
+            # default temperature (they reject a custom temperature).
+            kwargs["max_completion_tokens"] = max_tokens
+        else:
+            kwargs["max_tokens"] = max_tokens
+            kwargs["temperature"] = temperature
+        resp = self._c.chat.completions.create(**kwargs)
         choice = resp.choices[0]
         return ChatResult(
             text=choice.message.content or "",

@@ -89,7 +89,9 @@ class Generator72B:
 @modal.fastapi_endpoint(method="POST")
 def chat_endpoint(payload: dict):
     model_id = payload["model_id"]
-    gpu = MODELS.get(model_id)
+    if model_id not in MODELS:
+        raise ValueError(f"unknown model_id {model_id!r}; known: {list(MODELS)}")
+    gpu = MODELS[model_id]
     cls = Generator7B if gpu == "A10G" else Generator72B
     gen = cls(model_id=model_id)
     return gen.chat.remote(

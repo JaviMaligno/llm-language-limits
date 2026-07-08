@@ -5,7 +5,7 @@ Experiments on what LLMs do at the **edges of language**.
 ## Experiment 1 — Repetition (`experiments/repetition/`)
 How LLMs respond to absurd repetition of a phrase — single-turn (wall of text)
 and multi-turn (conversational insistence) — swept over N, categories, and models.
-Design: `personal-website/docs/superpowers/specs/2026-07-07-llm-repetition-breakdown-design.md`.
+Design and methodology are documented in the author's project notes (not vendored here yet).
 
 ## Setup
 ```bash

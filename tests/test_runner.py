@@ -34,3 +34,14 @@ def test_run_matrix_writes_and_resumes(tmp_path):
     run_matrix(lambda s: FakeClient(), JUDGE, [SPEC], [STIM],
                n_grid=[1, 3], modes=["single"], replicates=1, out_path=out)
     assert len(read_records(out)) == first
+
+
+class _BoomClient:
+    def chat(self, messages, system, temperature, max_tokens):
+        raise RuntimeError("boom")
+
+def test_run_matrix_skips_failing_cell_without_crashing(tmp_path):
+    out = tmp_path / "raw.jsonl"
+    run_matrix(lambda s: _BoomClient(), JUDGE, [SPEC], [STIM],
+               n_grid=[1], modes=["single"], replicates=1, out_path=out)
+    assert read_records(out) == []  # failing cell skipped, no crash, nothing written

@@ -1,5 +1,6 @@
 # src/llm_language_limits/runner.py
 from __future__ import annotations
+import time
 from typing import Callable
 from .config import ModelSpec, SYSTEM_PROMPT
 from .stimuli import Stimulus
@@ -55,6 +56,23 @@ def run_cell(client: ModelClient, judge_client: ModelClient, spec: ModelSpec,
     return rec
 
 
+def _run_cell_with_retry(client, judge_client, spec, stimulus, n, mode, replicate,
+                         *, max_attempts=3):
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return run_cell(client, judge_client, spec, stimulus, n, mode, replicate)
+        except Exception as e:  # noqa: BLE001 — keep the sweep alive on any provider error
+            label = f"{spec.label}/{stimulus.category}/N={n}/{mode}/rep{replicate}"
+            if attempt == max_attempts:
+                print(f"[skip] {label} failed after {max_attempts} attempts: "
+                      f"{type(e).__name__}: {e}")
+                return None
+            backoff = 2 ** attempt
+            print(f"[retry] {label} attempt {attempt} failed "
+                  f"({type(e).__name__}); backoff {backoff}s")
+            time.sleep(backoff)
+
+
 def run_matrix(client_factory: Callable[[ModelSpec], ModelClient],
                judge_client: ModelClient, specs: list[ModelSpec],
                stimuli: list[Stimulus], n_grid: list[int], modes: list[str],
@@ -69,5 +87,6 @@ def run_matrix(client_factory: Callable[[ModelSpec], ModelClient],
                         key = (spec.label, stim.category, n, mode, rep)
                         if key in done:
                             continue
-                        rec = run_cell(client, judge_client, spec, stim, n, mode, rep)
-                        append_record(out_path, rec)
+                        rec = _run_cell_with_retry(client, judge_client, spec, stim, n, mode, rep)
+                        if rec is not None:
+                            append_record(out_path, rec)
