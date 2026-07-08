@@ -11,7 +11,7 @@ def test_prompt_is_blind_to_metadata():
     assert "N=" not in joined and "model" not in joined.lower()
 
 def test_rubric_defines_all_labels():
-    for label in ("meta_complaint", "refusal", "degeneration_loop",
+    for label in ("meta_complaint", "disengaged", "refusal", "degeneration_loop",
                   "glitch_incoherence", "character_break", "divergence"):
         assert label in RUBRIC
 
@@ -29,3 +29,10 @@ def test_judge_handles_bad_json_gracefully():
     v = judge_response(client, "x")
     assert v.labels == ["normal"]
     assert v.rationale == "parse_error"
+
+def test_judge_parses_disengaged():
+    payload = json.dumps({"labels": ["disengaged"], "confidence": 0.7,
+                          "rationale": "one-word reply"})
+    client = FakeClient(reply_fn=lambda msgs: payload)
+    v = judge_response(client, "ok")
+    assert v.labels == ["disengaged"]

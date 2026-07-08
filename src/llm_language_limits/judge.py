@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, ValidationError
 from .clients.base import ModelClient
 
 BreakdownMode = Literal[
-    "normal", "meta_complaint", "refusal", "degeneration_loop",
+    "normal", "meta_complaint", "disengaged", "refusal", "degeneration_loop",
     "glitch_incoherence", "character_break", "divergence",
 ]
 
@@ -15,6 +15,7 @@ Output ONLY JSON: {"labels": [...], "confidence": 0-1, "rationale": "one line"}.
 Labels (multi-label allowed):
 - normal: coherent, on-task, in character.
 - meta_complaint: comments on / pushes back about the repetition or user behavior.
+- disengaged: the reply becomes terse / trails off / gives up / stops engaging WITHOUT an explicit complaint (e.g. a one-word or near-empty reply, or "ok", after longer earlier replies).
 - refusal: declines or says it cannot continue.
 - degeneration_loop: output itself loops or repeats degenerately.
 - glitch_incoherence: incoherent, garbled, or nonsensical text.

@@ -3,7 +3,7 @@ from __future__ import annotations
 import concurrent.futures
 import time
 from typing import Callable
-from .config import DEFAULT_MAX_WORKERS, ModelSpec, SYSTEM_PROMPT
+from .config import DEFAULT_MAX_WORKERS, MULTITURN_DEFAULT_CAP, ModelSpec, SYSTEM_PROMPT
 from .stimuli import Stimulus
 from .prompts import build_single_turn, build_multi_turn
 from .clients.base import ModelClient
@@ -15,7 +15,7 @@ from .storage import append_record, read_records, record_key
 def run_cell(client: ModelClient, judge_client: ModelClient, spec: ModelSpec,
              stimulus: Stimulus, n: int, mode: str, replicate: int, *,
              temperature: float = 0.0, max_tokens: int = 256,
-             multiturn_cap: int = 100) -> dict:
+             multiturn_cap: int = MULTITURN_DEFAULT_CAP) -> dict:
     self_sim_last = None
     turns_run = None
     if mode == "single":
@@ -58,7 +58,7 @@ def run_cell(client: ModelClient, judge_client: ModelClient, spec: ModelSpec,
 
 
 def _run_cell_with_retry(client, judge_client, spec, stimulus, n, mode, replicate,
-                         *, max_attempts=3):
+                         *, max_attempts=5):
     for attempt in range(1, max_attempts + 1):
         try:
             return run_cell(client, judge_client, spec, stimulus, n, mode, replicate)
@@ -68,7 +68,7 @@ def _run_cell_with_retry(client, judge_client, spec, stimulus, n, mode, replicat
                 print(f"[skip] {label} failed after {max_attempts} attempts: "
                       f"{type(e).__name__}: {e}")
                 return None
-            backoff = 2 ** attempt
+            backoff = min(30, 2 ** attempt)
             print(f"[retry] {label} attempt {attempt} failed "
                   f"({type(e).__name__}); backoff {backoff}s")
             time.sleep(backoff)
