@@ -2,7 +2,8 @@
 from __future__ import annotations
 import os
 from .base import ChatResult
-from ..config import ModelSpec
+from ..config import ModelSpec, Provider
+from ..ratelimit import throttle
 
 
 class AzureOpenAIClient:
@@ -18,6 +19,7 @@ class AzureOpenAIClient:
         )
 
     def chat(self, messages, system, temperature, max_tokens) -> ChatResult:
+        throttle(Provider.AZURE_OPENAI)
         full = [{"role": "system", "content": system}, *messages]
         kwargs = {"model": self.spec.id, "messages": full}
         if self.spec.id.startswith("gpt-5"):

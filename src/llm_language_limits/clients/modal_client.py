@@ -4,7 +4,8 @@ import urllib.error
 import urllib.request
 import json
 from .base import ChatResult
-from ..config import ModelSpec
+from ..config import ModelSpec, Provider
+from ..ratelimit import throttle
 
 
 class ModalClient:
@@ -27,11 +28,13 @@ class ModalClient:
                 f"Modal request failed for model {self.spec.id!r}: {e}") from e
 
     def chat(self, messages, system, temperature, max_tokens) -> ChatResult:
+        throttle(Provider.MODAL)
         d = self._post(messages, system, temperature, max_tokens, False)
         return ChatResult(text=d["text"], input_tokens=d["input_tokens"],
                           output_tokens=d["output_tokens"])
 
     def chat_with_hidden(self, messages, system, temperature, max_tokens):
+        throttle(Provider.MODAL)
         d = self._post(messages, system, temperature, max_tokens, True)
         res = ChatResult(text=d["text"], input_tokens=d["input_tokens"],
                          output_tokens=d["output_tokens"])

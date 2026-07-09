@@ -44,6 +44,14 @@ DEFAULT_MAX_WORKERS: int = 4
 # Minimal controlled system prompt used for EVERY model (methodological invariant).
 SYSTEM_PROMPT: str = "You are a helpful assistant."
 
+# Per-provider minimum seconds between API calls (throttle to stay under quota).
+# Tunable; Azure australiaeast has a very small quota, Modal endpoint is 1 container.
+PROVIDER_MIN_INTERVAL: dict = {
+    Provider.AZURE_OPENAI: 4.0,
+    Provider.ANTHROPIC: 1.0,
+    Provider.MODAL: 2.0,
+}
+
 
 def models_for(tier: str) -> list[ModelSpec]:
     if tier == "smoke":

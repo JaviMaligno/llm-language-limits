@@ -2,7 +2,8 @@
 from __future__ import annotations
 import os
 from .base import ChatResult
-from ..config import ModelSpec
+from ..config import ModelSpec, Provider
+from ..ratelimit import throttle
 
 
 class AnthropicClient:
@@ -17,6 +18,7 @@ class AnthropicClient:
             self._c = anthropic.Anthropic(api_key=key, timeout=90.0, max_retries=0)
 
     def chat(self, messages, system, temperature, max_tokens) -> ChatResult:
+        throttle(Provider.ANTHROPIC)
         # Claude 5-family models deprecate/reject `temperature`; they run at their
         # default temperature. `temperature` is accepted for protocol symmetry but
         # not forwarded — greedy (temperature=0) is only available on the open
