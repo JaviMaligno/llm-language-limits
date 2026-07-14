@@ -67,8 +67,10 @@ degeneration-loop, glitch/incoherence, character break, and divergence.
 The judge was homogenized after generation: all 286 records that had
 temporarily been annotated by the Azure fallback were re-annotated with
 `claude-sonnet-5`. Thus the final in-scope judge annotations use Claude for all
-three complete models. Eleven responses received a parse fallback with
-confidence 0 and should be treated as uncertain annotations.
+three complete models. Eleven responses initially received a parse fallback;
+they were manually reviewed against the rubric and relabeled with confidence
+0.9 (three character-level loops, six literal `table` loops, and two unrelated
+Python-task divergences).
 
 ## 4. Results
 
@@ -147,8 +149,8 @@ collapsed into a single score.
   for precise uncertainty estimates for every category and *N*.
 - The repetition ratio is whitespace-token based and does not capture semantic
   repetition or phrase-level loops.
-- LLM judging is rubric-based and imperfect; eleven parse fallbacks are marked
-  with confidence zero, and judge disagreement was not independently audited.
+- LLM judging is rubric-based and imperfect; eleven parser fallbacks required
+  manual review, and judge disagreement was not independently audited.
 - The complete comparison is limited to three models. Claude Opus, GPT-5,
   GPT-5-mini, GPT-5-nano, and Qwen 72B are incomplete or out of scope and must
   not be pooled into headline comparisons.
