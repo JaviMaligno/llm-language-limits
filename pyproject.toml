@@ -13,6 +13,7 @@ dependencies = [
     "anthropic>=0.34",
     "openai>=1.40",
     "tiktoken>=0.7",
+    "python-dotenv>=1.0",
 ]
 
 [project.optional-dependencies]
