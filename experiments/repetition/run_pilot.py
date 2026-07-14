@@ -11,6 +11,7 @@ from llm_language_limits.config import MODEL_REGISTRY
 from llm_language_limits.runner import run_matrix
 from llm_language_limits.storage import read_records, to_parquet
 from llm_language_limits.cost import estimate_cost, print_estimate
+from llm_language_limits.environment import load_project_env
 
 HERE = Path(__file__).parent
 OUT = HERE.parent.parent / "data" / "pilot.jsonl"
@@ -18,6 +19,7 @@ JUDGE_LABEL = "claude-sonnet"  # fixed primary judge (see spec §4.1)
 
 
 def main():
+    load_project_env()
     ap = argparse.ArgumentParser()
     ap.add_argument("--yes", action="store_true", help="skip the cost confirmation")
     args = ap.parse_args()

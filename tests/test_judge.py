@@ -36,3 +36,13 @@ def test_judge_parses_disengaged():
     client = FakeClient(reply_fn=lambda msgs: payload)
     v = judge_response(client, "ok")
     assert v.labels == ["disengaged"]
+
+
+def test_judge_removes_normal_when_combined_with_breakdown_label():
+    client = FakeClient(reply_fn=lambda _: json.dumps({
+        "labels": ["normal", "disengaged"],
+        "confidence": 0.8,
+        "rationale": "terse",
+    }))
+    verdict = judge_response(client, "ok")
+    assert verdict.labels == ["disengaged"]

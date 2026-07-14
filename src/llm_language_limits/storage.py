@@ -1,6 +1,7 @@
 # src/llm_language_limits/storage.py
 from __future__ import annotations
 import json
+import os
 from pathlib import Path
 import pandas as pd
 
@@ -17,6 +18,19 @@ def read_records(path: str | Path) -> list[dict]:
     if not p.exists():
         return []
     return [json.loads(line) for line in p.read_text().splitlines() if line.strip()]
+
+
+def write_records(path: str | Path, records: list[dict]) -> None:
+    """Atomically replace a JSONL dataset with ``records``."""
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_name(f".{p.name}.tmp")
+    with tmp.open("w") as f:
+        for record in records:
+            f.write(json.dumps(record) + "\n")
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, p)
 
 
 def to_parquet(jsonl_path: str | Path, parquet_path: str | Path) -> None:

@@ -2,7 +2,7 @@ from __future__ import annotations
 import json
 import re
 from typing import Literal
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, model_validator
 from .clients.base import ModelClient
 
 BreakdownMode = Literal[
@@ -12,7 +12,8 @@ BreakdownMode = Literal[
 
 RUBRIC = """You are labeling a single assistant response for breakdown modes.
 Output ONLY JSON: {"labels": [...], "confidence": 0-1, "rationale": "one line"}.
-Labels (multi-label allowed):
+Labels (multi-label allowed, except `normal` is exclusive and MUST NOT be
+combined with any other label):
 - normal: coherent, on-task, in character.
 - meta_complaint: comments on / pushes back about the repetition or user behavior.
 - disengaged: the reply becomes terse / trails off / gives up / stops engaging WITHOUT an explicit complaint (e.g. a one-word or near-empty reply, or "ok", after longer earlier replies).
@@ -30,6 +31,12 @@ class JudgeVerdict(BaseModel):
     labels: list[BreakdownMode] = Field(default_factory=lambda: ["normal"])
     confidence: float = 0.0
     rationale: str = ""
+
+    @model_validator(mode="after")
+    def make_normal_exclusive(self):
+        if len(self.labels) > 1 and "normal" in self.labels:
+            self.labels = [label for label in self.labels if label != "normal"]
+        return self
 
 
 def build_judge_prompt(response_text: str) -> list[dict]:

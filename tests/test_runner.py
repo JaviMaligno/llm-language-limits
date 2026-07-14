@@ -18,6 +18,13 @@ def test_run_cell_single_turn_record_shape():
     assert "length" in rec and "judge_labels" in rec
     assert rec["judge_labels"] == ["normal"]
 
+def test_run_cell_can_defer_judging_without_losing_generation():
+    rec = run_cell(FakeClient(), None, SPEC, STIM, n=3, mode="single", replicate=0)
+    assert rec["text"]
+    assert rec["judge_pending"] is True
+    assert rec["judge_labels"] == []
+    assert rec["judge_confidence"] is None
+
 def test_run_cell_multiturn_respects_cap():
     rec = run_cell(FakeClient(), JUDGE, SPEC, STIM, n=1000, mode="multi",
                    replicate=0, multiturn_cap=5)

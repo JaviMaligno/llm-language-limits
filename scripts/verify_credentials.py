@@ -4,6 +4,7 @@ from __future__ import annotations
 import os, sys
 from llm_language_limits.config import MODEL_REGISTRY, SYSTEM_PROMPT
 from llm_language_limits.clients import get_client
+from llm_language_limits.environment import load_project_env
 
 CHECKS = {
     "ANTHROPIC_API_KEY": "claude-sonnet",
@@ -13,6 +14,7 @@ CHECKS = {
 
 
 def main() -> int:
+    load_project_env()
     any_fail = False
     for env_key, label in CHECKS.items():
         if not os.environ.get(env_key):

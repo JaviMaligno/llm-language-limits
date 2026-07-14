@@ -36,9 +36,12 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
         exposes_hidden_states=True),
 }
 
-DEFAULT_N_GRID: list[int] = [1, 3, 10, 30, 100, 300, 1000]
-MULTITURN_MAX_TURNS: int = 300
-MULTITURN_DEFAULT_CAP: int = 300
+SINGLE_TURN_N_GRID: list[int] = [1, 3, 10, 30, 100, 300, 1000]
+MULTI_TURN_N_GRID: list[int] = [1, 3, 10, 30, 100]
+# Backwards-compatible alias used by the smoke/pilot scripts.
+DEFAULT_N_GRID: list[int] = SINGLE_TURN_N_GRID
+MULTITURN_MAX_TURNS: int = 100
+MULTITURN_DEFAULT_CAP: int = 100
 DEFAULT_MAX_WORKERS: int = 4
 
 # Minimal controlled system prompt used for EVERY model (methodological invariant).

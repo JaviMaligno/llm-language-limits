@@ -10,12 +10,14 @@ from llm_language_limits.clients import get_client
 from llm_language_limits.runner import run_matrix
 from llm_language_limits.storage import read_records
 from llm_language_limits.cost import estimate_cost
+from llm_language_limits.environment import load_project_env
 
 HERE = Path(__file__).parent
 OUT = HERE.parent.parent / "data" / "smoke.jsonl"
 
 
 def main():
+    load_project_env()
     spec = models_for("smoke")[0]
     stimuli = [s for s in load_stimuli(HERE / "stimuli.yaml") if s.category == "greeting"]
     judge = get_client(spec)  # reuse the cheap model as judge for smoke only

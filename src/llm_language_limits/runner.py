@@ -12,7 +12,7 @@ from .judge import judge_response
 from .storage import append_record, read_records, record_key
 
 
-def run_cell(client: ModelClient, judge_client: ModelClient, spec: ModelSpec,
+def run_cell(client: ModelClient, judge_client: ModelClient | None, spec: ModelSpec,
              stimulus: Stimulus, n: int, mode: str, replicate: int, *,
              temperature: float = 0.0, max_tokens: int = 256,
              multiturn_cap: int = MULTITURN_DEFAULT_CAP) -> dict:
@@ -37,7 +37,7 @@ def run_cell(client: ModelClient, judge_client: ModelClient, spec: ModelSpec,
     else:
         raise ValueError(f"unknown mode: {mode}")
 
-    verdict = judge_response(judge_client, final_text)
+    verdict = judge_response(judge_client, final_text) if judge_client is not None else None
     rec = {
         "model": spec.label, "category": stimulus.category, "n": n,
         "mode": mode, "replicate": replicate,
@@ -45,8 +45,9 @@ def run_cell(client: ModelClient, judge_client: ModelClient, spec: ModelSpec,
         "repetition_ratio": metrics.repetition_ratio(final_text),
         "entropy": metrics.token_entropy(final_text),
         "is_refusal": metrics.is_refusal(final_text),
-        "judge_labels": verdict.labels,
-        "judge_confidence": verdict.confidence,
+        "judge_labels": verdict.labels if verdict else [],
+        "judge_confidence": verdict.confidence if verdict else None,
+        "judge_pending": verdict is None,
         "input_tokens": res.input_tokens, "output_tokens": res.output_tokens,
         "text": final_text,
     }
@@ -70,7 +71,7 @@ def _run_cell_with_retry(client, judge_client, spec, stimulus, n, mode, replicat
                 return None
             backoff = min(30, 2 ** attempt)
             print(f"[retry] {label} attempt {attempt} failed "
-                  f"({type(e).__name__}); backoff {backoff}s")
+                  f"({type(e).__name__}: {e}); backoff {backoff}s")
             time.sleep(backoff)
 
 
