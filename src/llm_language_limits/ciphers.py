@@ -117,7 +117,10 @@ def _block_perm(perm: list[int]):
     return (lambda t: apply(perm, t)), (lambda t: apply(inv, t))
 
 
-_CYR = {"a": "а", "c": "с", "e": "е", "o": "о", "p": "р", "x": "х", "y": "у"}
+_CYR = {
+    "a": "а", "c": "с", "e": "е", "o": "о", "p": "р", "x": "х", "y": "у",
+    "A": "А", "C": "С", "E": "Е", "O": "О", "P": "Р", "X": "Х", "Y": "У",
+}
 _CYR_INV = {v: k for k, v in _CYR.items()}
 _VOWELS = set("aeiouAEIOU")
 
@@ -132,7 +135,7 @@ def make_ciphers(seed: int = 0) -> dict[str, Cipher]:
     rng.shuffle(block)
     blk_enc, blk_dec = _block_perm(block)
 
-    cyr_enc = lambda t: "".join(_CYR.get(c.lower(), c) for c in t)
+    cyr_enc = lambda t: "".join(_CYR.get(c, c) for c in t)
     cyr_dec = lambda t: "".join(_CYR_INV.get(c, c) for c in t)
 
     ciphers = [

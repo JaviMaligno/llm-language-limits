@@ -28,3 +28,8 @@ def test_lossy_flagged():
 def test_binary_shape():
     enc = CIPHERS["binary"].encode("A")   # 'A' = 65 = 1000001
     assert enc == "1000001"
+
+def test_cyrillic_homoglyph_preserves_case():
+    c = CIPHERS["cyrillic_homoglyph"]
+    for s in ["Apple Pie", "COPY that", "Oxygen", "hello"]:
+        assert c.decode(c.encode(s)) == s
