@@ -197,12 +197,13 @@ def sweep(models: list[str], single_n_grid: list[int], multi_n_grid: list[int],
 
 @app.local_entrypoint()
 def main(models: str = "qwen7b-base", quick: bool = False,
-         skip_judge: bool = False):
+         skip_judge: bool = False, multi_max: int = 100):
     # models: comma-separated labels, e.g. "qwen7b-base" or "qwen7b-instruct,qwen7b-base"
     # quick: tiny grid for plumbing validation (single-turn, N in {1,3}, 1 rep).
+    # multi_max: cap the multi-turn N grid (e.g. 30 to skip the expensive N=100 cells).
     model_list = [m.strip() for m in models.split(",") if m.strip()]
     single_n_grid = [1, 3] if quick else [1, 3, 10, 30, 100, 300, 1000]
-    multi_n_grid = [] if quick else [1, 3, 10, 30, 100]
+    multi_n_grid = [] if quick else [n for n in (1, 3, 10, 30, 100) if n <= multi_max]
     reps = 1 if quick else 3
     if quick:
         # blocking, for local plumbing validation
