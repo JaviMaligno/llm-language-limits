@@ -45,3 +45,24 @@ def test_short_coded_production_detected_via_task():
     client = FakeClient(reply_fn=lambda m: ROT13.encode(answer))
     rec = run_conversation(client, ROT13, TASK_BANK, "pure", turn_cap=2)
     assert rec["first_production_turn"] == 1
+
+
+def test_escalating_no_consecutive_user_messages():
+    # the fake asserts alternation on every history it receives;
+    # before the fix, the hint2 turn produced two consecutive user messages.
+    def reply_fn(messages):
+        roles = [m["role"] for m in messages]
+        for a, b in zip(roles, roles[1:]):
+            assert not (a == b == "user"), f"consecutive user messages: {roles}"
+        return "ok"
+    client = FakeClient(reply_fn=reply_fn)
+    run_conversation(client, ROT13, TASK_BANK, "escalating", turn_cap=6)
+
+
+def test_first_explicit_turn_anchors_on_task_prompt():
+    # a fake that replies with ONLY the decoded task prompt (not the meta-instruction)
+    # must still register an explicit-decode success on the marked turn (default explicit_every=3).
+    third = TASK_BANK[2]  # turn 3's task (rotation is (turn-1) % len)
+    client = FakeClient(reply_fn=lambda m: third.prompt)
+    rec = run_conversation(client, ROT13, TASK_BANK, "pure", turn_cap=3)
+    assert rec["first_explicit_turn"] == 3

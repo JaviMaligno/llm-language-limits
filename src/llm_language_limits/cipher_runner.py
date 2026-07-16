@@ -31,14 +31,14 @@ def run_conversation(client, cipher: Cipher, tasks: list[Task], protocol: str, *
     for turn in range(1, turn_cap + 1):
         if protocol == "escalating" and turn == hint1:
             history += build_fewshot_preamble(cipher, tasks, 1)
+        hint_text = ""
         if protocol == "escalating" and turn == hint2:
-            history.append({"role": "user",
-                            "content": f"(the code is {cipher.name}; reply in the same code)"})
+            hint_text = f"(the code is {cipher.name}; reply in the same code)\n"
 
         task = tasks[(turn - 1) % len(tasks)]
         ask_decode = (turn % explicit_every == 0)
         prompt_plain = task.prompt + ("  (also: write this message in plain English)" if ask_decode else "")
-        history.append({"role": "user", "content": cipher.encode(prompt_plain)})
+        history.append({"role": "user", "content": hint_text + cipher.encode(prompt_plain)})
 
         res = client.chat(history, SYSTEM_PROMPT, temperature, max_tokens)
         reply = res.text
@@ -46,7 +46,7 @@ def run_conversation(client, cipher: Cipher, tasks: list[Task], protocol: str, *
 
         if first_action is None and comprehension_action(reply, task, cipher):
             first_action = turn
-        if ask_decode and first_explicit is None and explicit_decode(reply, prompt_plain):
+        if ask_decode and first_explicit is None and explicit_decode(reply, task.prompt):
             first_explicit = turn
         # CRITICAL OVERRIDE (task 4 brief): pass task= so the oracle-anchor path in
         # produced_in_code can fire on short coded answers (e.g. rot13("banana") == "onanan",
