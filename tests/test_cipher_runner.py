@@ -66,3 +66,23 @@ def test_first_explicit_turn_anchors_on_task_prompt():
     client = FakeClient(reply_fn=lambda m: third.prompt)
     rec = run_conversation(client, ROT13, TASK_BANK, "pure", turn_cap=3)
     assert rec["first_explicit_turn"] == 3
+
+
+def test_fewshot_preamble_has_plaintext_key():
+    # the user side must be readable plaintext (the task prompt), the assistant side its encoding
+    msgs = build_fewshot_preamble(ROT13, TASK_BANK, 2)
+    assert len(msgs) == 4
+    for i in range(0, 4, 2):
+        plain = msgs[i]["content"]
+        coded = msgs[i + 1]["content"]
+        assert plain in [t.prompt for t in TASK_BANK]      # user side is real plaintext
+        assert coded == ROT13.encode(plain)                # assistant side is that text, coded
+        assert coded != plain                              # and they actually differ (a real key)
+
+
+def test_record_carries_token_totals_and_stops():
+    client = FakeClient(reply_fn=lambda m: "banana")
+    rec = run_conversation(client, ROT13, TASK_BANK, "pure", turn_cap=3)
+    assert isinstance(rec["input_tokens"], int) and rec["input_tokens"] > 0
+    assert isinstance(rec["output_tokens"], int) and rec["output_tokens"] > 0
+    assert len(rec["stop_signals"]) == 3

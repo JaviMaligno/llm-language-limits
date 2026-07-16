@@ -7,11 +7,22 @@ from .cipher_detect import comprehension_action, produced_in_code, explicit_deco
 Message = dict
 
 
+def _stop_signal(raw):
+    """Best-effort per-turn stop/finish reason from a provider's raw payload."""
+    if not isinstance(raw, dict):
+        return None
+    return raw.get("stop_reason") or raw.get("finish_reason")
+
+
 def build_fewshot_preamble(cipher: Cipher, tasks: list[Task], k: int) -> list[Message]:
+    # A genuine Rosetta stone: the user side is PLAINTEXT, the assistant side is that
+    # same text ENCODED. This shows a real plain<->coded pair (a decoding key) AND
+    # demonstrates the assistant replying in code (induces production). Without the
+    # plaintext side the few-shot protocol would be indistinguishable from pure inference.
     msgs: list[Message] = []
     for t in tasks[:k]:
-        msgs.append({"role": "user", "content": cipher.encode(t.prompt)})
-        msgs.append({"role": "assistant", "content": cipher.encode("ok: " + t.prompt)})
+        msgs.append({"role": "user", "content": t.prompt})
+        msgs.append({"role": "assistant", "content": cipher.encode(t.prompt)})
     return msgs
 
 
@@ -27,6 +38,8 @@ def run_conversation(client, cipher: Cipher, tasks: list[Task], protocol: str, *
 
     first_action = first_explicit = first_production = None
     prod_flags: list[bool] = []
+    total_input = total_output = 0
+    stop_signals: list = []
 
     for turn in range(1, turn_cap + 1):
         if protocol == "escalating" and turn == hint1:
@@ -43,6 +56,9 @@ def run_conversation(client, cipher: Cipher, tasks: list[Task], protocol: str, *
         res = client.chat(history, SYSTEM_PROMPT, temperature, max_tokens)
         reply = res.text
         history.append({"role": "assistant", "content": reply})
+        total_input += res.input_tokens
+        total_output += res.output_tokens
+        stop_signals.append(_stop_signal(res.raw))
 
         if first_action is None and comprehension_action(reply, task, cipher):
             first_action = turn
@@ -67,4 +83,6 @@ def run_conversation(client, cipher: Cipher, tasks: list[Task], protocol: str, *
         "first_action_turn": first_action, "first_explicit_turn": first_explicit,
         "first_production_turn": first_production,
         "production_consistency": consistency,
+        "input_tokens": total_input, "output_tokens": total_output,
+        "stop_signals": stop_signals,
     }
