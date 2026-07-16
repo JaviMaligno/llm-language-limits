@@ -1,6 +1,7 @@
 # experiments/ciphers/sweep.py
 from __future__ import annotations
 import concurrent.futures
+import itertools
 import time
 from llm_language_limits.ciphers import CIPHERS
 from llm_language_limits.oracle import TASK_BANK
@@ -45,14 +46,21 @@ def run_sweep(client_factory, specs, cipher_names, protocols, replicates, out_pa
               *, turn_cap, resume=True, max_workers=4):
     done = {cell_key(r) for r in read_records(out_path)} if resume else set()
     clients = {s.label: client_factory(s) for s in specs}
-    pending = []
+    # Build one work-list per spec, then ROUND-ROBIN interleave across specs. The rate
+    # limiter throttles per PROVIDER, so interleaving keeps the concurrent workers spanning
+    # different providers (Anthropic/Azure/Modal) — their throttles then run in parallel
+    # instead of serially draining one provider's leg before starting the next.
+    per_spec = []
     for spec in specs:
-        for cn in cipher_names:
-            for proto in protocols:
-                for rep in range(replicates):
-                    if (spec.label, cn, proto, rep) in done:
-                        continue
-                    pending.append((spec, cn, proto, rep))
+        lst = [(spec, cn, proto, rep)
+               for cn in cipher_names
+               for proto in protocols
+               for rep in range(replicates)
+               if (spec.label, cn, proto, rep) not in done]
+        if lst:
+            per_spec.append(lst)
+    pending = [cell for group in itertools.zip_longest(*per_spec)
+               for cell in group if cell is not None]
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
         futs = [pool.submit(_run_cell_with_retry, clients[s.label], s, cn, proto, rep, turn_cap)
                 for (s, cn, proto, rep) in pending]
