@@ -8,9 +8,18 @@ def normalize(s: str) -> str:
     return " ".join(re.sub(r"[^a-z0-9 ]", " ", s.lower()).split())
 
 
+def _tokens(s: str) -> set[str]:
+    return set(normalize(s).split())
+
+
 def _contains(word: str) -> Callable[[str], bool]:
-    w = normalize(word)
-    return lambda resp: w in normalize(resp)
+    needed = normalize(word).split()          # phrase -> all tokens must be present
+    return lambda resp: needed != [] and all(tok in _tokens(resp) for tok in needed)
+
+
+def _contains_any(words) -> Callable[[str], bool]:
+    normed = [normalize(w).split() for w in words]
+    return lambda resp: any(toks and all(t in _tokens(resp) for t in toks) for toks in normed)
 
 
 @dataclass(frozen=True)
@@ -21,14 +30,13 @@ class Task:
 
 
 TASK_BANK: list[Task] = [
-    Task("banana", "reply with the single word banana", _contains("banana")),
-    Task("add_7_5", "what is seven plus five", _contains("12")),
+    Task("banana", "reply with the name of the long yellow fruit", _contains("banana")),
+    Task("add_7_5", "what is seven plus five", _contains_any(["12", "twelve"])),
     Task("capital_france", "name the capital of france", _contains("paris")),
-    Task("sky_blue", "reply yes or no is the sky blue", _contains("yes")),
-    Task("color", "name a primary color",
-         lambda r: any(c in normalize(r) for c in ("red", "blue", "yellow"))),
+    Task("sky_blue", "answer with a single word is the daytime sky blue", _contains("yes")),
+    Task("color", "name a primary color", _contains_any(["red", "blue", "yellow"])),
     Task("count_three", "count from one to three",
-         lambda r: all(n in normalize(r) for n in ("one", "two", "three"))),
+         lambda r: all(n in _tokens(r) for n in ("one", "two", "three"))),
     Task("opposite_hot", "what is the opposite of hot", _contains("cold")),
     Task("animal_bark", "what animal says woof", _contains("dog")),
 ]
