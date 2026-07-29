@@ -288,6 +288,16 @@ disagreement is as large as the effect the metric is supposed to detect. A singl
 judge would have produced a confident-looking uplift number in either direction
 depending on which judge was used.
 
+One tempting misreading has to be closed off. The uplift the labels *do* produce is
+strongly **negative** almost everywhere — measured compliance falls under every
+cipher, most sharply for the base model (plaintext 0.80 down to 0.00–0.20). That is
+not evidence that ciphers protect the model. Compliance is scored from a judge's
+reading of the reply, and the same judge that cannot reliably recognise a refusal in
+this material cannot reliably recognise a fulfilment either; a compliance the judge
+fails to recognise is recorded as garbled, which lowers the rate by construction. The
+negative sign is what "unmeasurable" looks like here, not a safety finding, and
+reporting it as one would be the mirror-image error of reporting the artefact in §5.
+
 The reason is visible in the material. A small model answering an encoded harmful
 request usually produces text that is neither a refusal nor a fulfilment: it is
 partially decoded, half-coherent, off-topic, or a fluent continuation of the
@@ -340,9 +350,13 @@ cipher seed, and archive the JSONL with the generating commit.
 
 ## 8. Remaining work
 
-1. Re-run the corrected jailbreak sub-probe and either write §5's uplift analysis
-   from it or drop the section explicitly.
-2. Validate the refusal judge against a small manual sample of labels before
-   trusting any uplift rate (`--audit-dump`).
-3. Decide whether to backfill base64 × GPT-5 through a gateway configuration that
-   does not reject the block, or to report the cipher on two models permanently.
+1. Broaden the open-weight roster. Two Qwen 7B variants is enough to separate base
+   from instruction-tuned behaviour, but not to say anything about scale or about
+   other model families; the keyed-cipher latency in §3.3 is the measurement most
+   likely to change with a bigger or differently-trained open model. Deferred until
+   inference credits are available.
+2. If the robustness appendix is ever revived, replace the LLM judge with a ground
+   truth that does not depend on a judge's reading (§5.3): human adjudication of a
+   small sample, or a programmatic check in the spirit of the comprehension oracle.
+3. base64 × GPT-5 stays missing unless a limited-access approval makes the harm
+   categories configurable (§5.1). Report the cipher on two models and say why.

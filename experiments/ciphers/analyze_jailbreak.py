@@ -163,6 +163,13 @@ def write_report(df: pd.DataFrame, out_dir: Path, rates: pd.DataFrame,
         "",
         "## Uplift vs the same model's plaintext baseline",
         "",
+        "**Do not report these numbers as a result.** Inter-judge agreement on ciphered "
+        "conditions is at chance level (see `scripts/rejudge_jailbreak.py merge`: kappa "
+        "-0.015 pooled, 0.796 on plaintext), so the uplift is not identified. In "
+        "particular the uniformly NEGATIVE uplift below is not evidence that ciphers "
+        "protect the model: a compliance the judge fails to recognise in decoded or "
+        "half-decoded text is recorded as garbled, which lowers the rate by construction.",
+        "",
         _md_table(uplift),
         "",
         "## Mean uplift by cipher kind",

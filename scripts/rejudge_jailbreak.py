@@ -117,6 +117,62 @@ def agreement(first: dict[tuple, str], second: dict[tuple, str]) -> dict:
             "confusion": dict(Counter(pairs))}
 
 
+def batch_fingerprint(views: list[dict]) -> str:
+    """Stable id for a batch's exact composition and order."""
+    import hashlib
+    payload = "|".join("/".join(str(part) for part in view_key(v)) for v in views)
+    return hashlib.sha256(payload.encode()).hexdigest()[:16]
+
+
+def write_batch(work_dir: Path, index: int, views: list[dict], prompt_text: str) -> str:
+    """Write one batch's prompt + views, stamped with its fingerprint."""
+    work_dir = Path(work_dir)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    stem = f"batch_{index:02d}"
+    fingerprint = batch_fingerprint(views)
+    (work_dir / f"{stem}.prompt.txt").write_text(prompt_text)
+    (work_dir / f"{stem}.views.jsonl").write_text(
+        "\n".join(json.dumps(v) for v in views) + "\n")
+    (work_dir / f"{stem}.fingerprint").write_text(fingerprint)
+    return fingerprint
+
+
+def stale_replies(work_dir: Path) -> list[str]:
+    """Batches whose reply was produced for a DIFFERENT composition of that batch.
+
+    Re-running `prepare` after new data arrives recomposes the batches; a leftover reply
+    would then be parsed positionally against different views, mislabelling all of them.
+    """
+    stale = []
+    for views_path in sorted(Path(work_dir).glob("batch_*.views.jsonl")):
+        stem = views_path.name.split(".")[0]
+        reply_path = views_path.with_name(f"{stem}.reply.txt")
+        stamp_path = views_path.with_name(f"{stem}.reply.fingerprint")
+        if not reply_path.exists():
+            continue
+        current = batch_fingerprint(load_views(views_path))
+        recorded = stamp_path.read_text().strip() if stamp_path.exists() else ""
+        if recorded != current:
+            stale.append(stem)
+    return stale
+
+
+def load_second_judge(work_dir: Path) -> dict[tuple, str]:
+    """Second judge's labels, refusing to read any reply that no longer matches its batch."""
+    stale = stale_replies(work_dir)
+    if stale:
+        raise ValueError(
+            f"stale reply files for {stale}: they were produced for a different batch "
+            "composition. Delete them and re-run judge-azure.")
+    labels: dict[tuple, str] = {}
+    for views_path in sorted(Path(work_dir).glob("batch_*.views.jsonl")):
+        stem = views_path.name.split(".")[0]
+        reply_path = views_path.with_name(f"{stem}.reply.txt")
+        if reply_path.exists():
+            labels.update(parse_labels(reply_path.read_text(), load_views(views_path)))
+    return labels
+
+
 def agreement_by(rows: list[dict], field: str) -> list[dict]:
     """Inter-judge agreement per group (e.g. per cipher condition).
 
@@ -159,6 +215,11 @@ def judge_batches(work_dir: Path, judge_fn, overwrite: bool = False) -> list[str
             print(f"[judge] {stem} failed: {type(error).__name__}: {str(error)[:120]}")
             continue
         reply_path.write_text(reply)
+        views_path = prompt_path.with_name(f"{stem}.views.jsonl")
+        if views_path.exists():
+            # bind the reply to the exact batch it answered
+            reply_path.with_name(f"{stem}.reply.fingerprint").write_text(
+                batch_fingerprint(load_views(views_path)))
         done.append(stem)
     return done
 
@@ -196,28 +257,26 @@ def _prepare(args) -> None:
     batches = make_batches(sample, args.batch_size)
     args.work_dir.mkdir(parents=True, exist_ok=True)
     for index, batch in enumerate(batches):
-        (args.work_dir / f"batch_{index:02d}.prompt.txt").write_text(
-            render_batch(batch, requests))
-        (args.work_dir / f"batch_{index:02d}.views.jsonl").write_text(
-            "\n".join(json.dumps(v) for v in batch) + "\n")
+        write_batch(args.work_dir, index, batch, render_batch(batch, requests))
+    stale = stale_replies(args.work_dir)
+    if stale:
+        print(f"[prepare] {len(stale)} reply files no longer match their batch and will be "
+              f"ignored until re-judged: {stale}")
     print(f"[prepare] {len(sample)} views -> {len(batches)} batches in {args.work_dir}")
     print("[prepare] hand each *.prompt.txt to the second judge, save its raw reply as "
           "batch_NN.reply.txt in the same directory, then run: merge")
 
 
 def _merge(args) -> None:
-    second: dict[tuple, str] = {}
     first: dict[tuple, str] = {}
     missing = []
     for views_path in sorted(args.work_dir.glob("batch_*.views.jsonl")):
-        reply_path = views_path.with_name(views_path.name.split(".")[0] + ".reply.txt")
-        batch = load_views(views_path)
-        for view in batch:
+        stem = views_path.name.split(".")[0]
+        for view in load_views(views_path):
             first[view_key(view)] = view["label"]
-        if not reply_path.exists():
-            missing.append(reply_path.name)
-            continue
-        second.update(parse_labels(reply_path.read_text(), batch))
+        if not views_path.with_name(f"{stem}.reply.txt").exists():
+            missing.append(f"{stem}.reply.txt")
+    second = load_second_judge(args.work_dir)   # raises on stale replies
     if missing:
         print(f"[merge] WARNING: {len(missing)} batches have no reply yet: {missing}")
     stats = agreement(first, second)

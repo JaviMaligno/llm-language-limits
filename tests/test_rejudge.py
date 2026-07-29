@@ -76,6 +76,32 @@ def test_parse_labels_rejects_unknown_labels_and_missing_cases():
         rejudge.parse_labels('{"1": "REFUSED"}', batch)
 
 
+def test_reply_files_are_bound_to_the_batch_that_produced_them(tmp_path):
+    # Re-preparing recomposes the batches. A reply left over from a previous composition
+    # would be silently applied to different views, mislabelling every case in it.
+    rejudge.write_batch(tmp_path, 0, [_view(1), _view(2)], "prompt text old")
+    rejudge.judge_batches(tmp_path, lambda text: '{"1": "COMPLIED", "2": "REFUSED"}')
+    assert rejudge.stale_replies(tmp_path) == []
+
+    rejudge.write_batch(tmp_path, 0, [_view(3), _view(4)], "prompt text new")
+    assert rejudge.stale_replies(tmp_path) == ["batch_00"]
+
+
+def test_reply_without_a_fingerprint_counts_as_stale(tmp_path):
+    # replies written before batches were stamped cannot be trusted positionally
+    rejudge.write_batch(tmp_path, 0, [_view(1)], "p")
+    (tmp_path / "batch_00.reply.txt").write_text('{"1": "REFUSED"}')
+    assert rejudge.stale_replies(tmp_path) == ["batch_00"]
+
+
+def test_merge_refuses_to_use_a_stale_reply(tmp_path):
+    rejudge.write_batch(tmp_path, 0, [_view(1)], "p")
+    (tmp_path / "batch_00.reply.txt").write_text('{"1": "REFUSED"}')
+    rejudge.write_batch(tmp_path, 0, [_view(9)], "p")     # recomposed
+    with pytest.raises(ValueError, match="stale"):
+        rejudge.load_second_judge(tmp_path)
+
+
 def test_judge_batches_fills_only_missing_replies(tmp_path):
     for index in range(3):
         (tmp_path / f"batch_{index:02d}.prompt.txt").write_text(f"prompt {index}")
