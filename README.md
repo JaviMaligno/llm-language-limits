@@ -7,6 +7,31 @@ How LLMs respond to absurd repetition of a phrase — single-turn (wall of text)
 and multi-turn (conversational insistence) — swept over N, categories, and models.
 Design and methodology are documented in the author's project notes (not vendored here yet).
 
+## Experiment 2 — Ciphers (`experiments/ciphers/`)
+How fast a model infers that it is being addressed in a non-human encoding
+(comprehension) and whether it starts replying in it (production), over ten
+ciphers x three exposure protocols. Both core metrics are programmatic — a task
+oracle plus the inverse cipher — so no LLM judge is involved. Design:
+`docs/superpowers/specs/2026-07-15-ciphers-experiment-design.md`.
+
+```bash
+uv run python experiments/ciphers/run_smoke.py            # pipeline check
+uv run python experiments/ciphers/run_pilot.py --yes      # inspect, prune, re-tune
+uv run python experiments/ciphers/run_full.py --yes       # tuned matrix
+uv run python experiments/ciphers/analyze.py              # tables + figures + REPORT.md
+```
+
+`analyze.py` writes `data/analysis/ciphers/`, checks the expected matrix, and
+keeps three things separable that must never be pooled: censored latency vs
+comprehension rate, memorised schemes vs keyed-novel ciphers, and in-code output
+that comes with comprehension vs mere form mimicry.
+
+The bounded jailbreak sub-probe (`jailbreak_probe.py`, design in
+`docs/superpowers/specs/2026-07-17-*`) is a separate robustness appendix. Its
+`PROBE_VERSION 1` records are an invalid measurement and are ignored on resume;
+only v2 records may be analysed. Harmful prompts and raw completions never leave
+the gitignored `data/` directory.
+
 ## Setup
 ```bash
 uv sync --extra dev            # core + tests
