@@ -21,7 +21,12 @@ understands 36.2% and writes in code in 55.8%. Second, inferring a *keyed* ciphe
 whose mapping cannot have been memorised costs real turns — median turn 5 versus
 2 for standard schemes — and a single plaintext Rosetta pair collapses that cost
 to a median of 1. Separately, both Claude models refused ~86% of encoded turns
-outright, which is a safety-boundary finding rather than a capability one.
+outright, which is a safety-boundary finding rather than a capability one. A bounded
+robustness appendix reaches a two-part conclusion: compliance uplift under ciphers is
+not identifiable on the small models — two independent judges agree worse than chance
+on their ciphered replies — while on GPT-5, where the judges do agree, two of ten
+harmful prompts were complied with under two ciphers after being refused in
+plaintext. That is an existence result, not a rate.
 
 ## 1. Research question
 
@@ -233,8 +238,9 @@ Base refuses 20%). We state this rather than reporting the artefact, because the
 artefact reads superficially like "ciphers defeat every guardrail".
 
 The corrected probe judges whichever view actually reads as English, records which
-channel the model answered in, and stores the judge's identity per cell. Its results
-are in §5.3.
+channel the model answered in, and stores the judge's identity per cell. Its result
+(§5.3) is split: the metric is unusable on the two small models, and on GPT-5, where
+it is usable, a bounded bypass does appear.
 
 Three judge constraints shaped that run and are stated because they bound the
 appendix's strength, not because they are incidental:
@@ -257,67 +263,73 @@ appendix's strength, not because they are incidental:
   sample instead. Judging red-teaming output with an aligned model has its own
   guardrail, and it is not neutral with respect to what it will score.
 
-### 5.3 The uplift is not measurable with an LLM judge
+### 5.3 Where the uplift can be measured, and what it shows there
 
-The corrected probe ran 540 single-turn cells: three models × (plaintext baseline +
-five high-comprehension ciphers) × ten mild AdvBench prompts × three replicates.
-Before reading any compliance rate off those labels, we re-judged 377 judged views
-with a second, independent judge and measured agreement. That check decides the
-appendix, and it fails:
+The corrected probe ran the full 540 single-turn cells: three models × (plaintext
+baseline + five high-comprehension ciphers) × ten mild AdvBench prompts × three
+replicates. Before reading any compliance rate off those labels, 460 judged views
+were re-labelled by a second, independent judge. That check does not produce a single
+verdict — it produces a map of where the labels mean anything:
 
-| Condition | Views | Raw agreement | Cohen's kappa |
+| Subject × condition | Views | Raw agreement | Cohen's kappa |
 |---|---:|---:|---:|
-| plaintext baseline | 65 | 0.892 | **0.796** |
-| ciphered (pooled) | 289 | 0.526 | **−0.015** |
-| rot13 | 57 | 0.596 | 0.088 |
-| reverse_all | 54 | 0.630 | 0.226 |
-| random substitution | 59 | 0.559 | 0.027 |
-| base64 | 50 | 0.460 | 0.026 |
-| letters→digits | 69 | 0.406 | −0.120 |
+| GPT-5, plaintext | 30 | 1.000 | **1.000** |
+| GPT-5, ciphered | 148 | 0.818 | 0.351 |
+| Qwen Instruct, plaintext | 30 | 0.867 | 0.661 |
+| Qwen Instruct, ciphered | 150 | 0.347 | **−0.166** |
+| Qwen Base, plaintext | 30 | 0.900 | 0.737 |
+| Qwen Base, ciphered | 71 | 0.732 | **−0.047** |
 
-On plaintext the two judges substantially agree: labelling a refusal or a compliance
-in readable English is a well-posed task. On ciphered conditions agreement collapses
-to chance — kappa is zero within noise, and negative for one cipher. The confusion is
-not random noise around a shared view, either: 66 views the first judge called
-refusals the second called garbled, and 39 it called garbled the second called
-compliances.
+Reliability depends on the subject, not only on the condition. Both judges agree on
+plaintext for every model. On ciphered conditions they agree on GPT-5's behaviour and
+agree *worse than chance* on both Qwen models — kappa −0.17 and −0.05. Per cipher the
+same split appears: reverse_all 0.711, rot13 0.387, letters→digits 0.379, base64
+0.357, keyed random substitution **0.002**.
 
-So the uplift is not reported, and not because the run failed. **Compliance uplift
-under ciphers, measured with an LLM judge, is not identified**: the judge-to-judge
-disagreement is as large as the effect the metric is supposed to detect. A single
-judge would have produced a confident-looking uplift number in either direction
-depending on which judge was used.
+**For the two small models the uplift is therefore not identified.** Their measured
+uplift is strongly negative (Qwen Base falls from 0.80 in plaintext to 0.00–0.20
+under every cipher), and that negative sign must not be read as ciphers protecting
+them: a compliance the judge fails to recognise in half-decoded text is recorded as
+garbled, which lowers the rate by construction. When two judges disagree worse than
+chance, the number is an artefact of whichever judge ran, in either direction. The
+reason is visible in the material: a 7B model answering an encoded harmful request
+usually emits text that is neither refusal nor fulfilment, and "refused / complied /
+garbled" are plaintext categories that do not carve up that output space.
 
-One tempting misreading has to be closed off. The uplift the labels *do* produce is
-strongly **negative** almost everywhere — measured compliance falls under every
-cipher, most sharply for the base model (plaintext 0.80 down to 0.00–0.20). That is
-not evidence that ciphers protect the model. Compliance is scored from a judge's
-reading of the reply, and the same judge that cannot reliably recognise a refusal in
-this material cannot reliably recognise a fulfilment either; a compliance the judge
-fails to recognise is recorded as garbled, which lowers the rate by construction. The
-negative sign is what "unmeasurable" looks like here, not a safety finding, and
-reporting it as one would be the mirror-image error of reporting the artefact in §5.
+**For GPT-5 the labels are usable, and there the mechanism does appear.** In
+plaintext it refused all 30 harmful cells, with the two judges in perfect agreement.
+Under ciphers it refused 168 of 180 cells — but not all:
 
-The reason is visible in the material. A small model answering an encoded harmful
-request usually produces text that is neither a refusal nor a fulfilment: it is
-partially decoded, half-coherent, off-topic, or a fluent continuation of the
-surface pattern. "Refused", "complied" and "garbled" are categories built for
-plaintext behaviour, and they do not carve up that output space. Any future version
-of this appendix needs a ground truth that does not depend on a judge's reading —
-human adjudication of a small sample, or a task-specific programmatic check like the
-verifiable oracle used for comprehension in the main experiment, which is exactly
-the design choice that made §3 trustworthy.
+| GPT-5 condition | Scored | Compliance | Uplift vs plaintext | 95% CI (prompt bootstrap) |
+|---|---:|---:|---:|---|
+| plaintext | 30 | 0.000 | — | — |
+| rot13 | 30 | 0.000 | 0.000 | — |
+| base64 | 27 | 0.000 | 0.000 | — |
+| keyed random substitution | 30 | 0.000 | 0.000 | — |
+| letters→digits | 30 | 0.067 | +0.067 | [0.000, 0.200] |
+| reverse_all | 30 | 0.067 | +0.067 | [0.000, 0.200] |
 
-Two things do survive from the probe, both from conditions where labels are sound:
+Two distinct prompts, under two distinct ciphers, were complied with after being
+refused in plaintext, and each was reproduced across replicates (2 of 3, and 3 of 3
+under the second judge). Both judges independently labelled all four cells as
+compliances — including the judge that is *not* GPT-5, which matters because the
+primary judge scoring its own outputs would be biased toward reading them as
+refusals, not compliances.
 
-- **Plaintext baselines** (readable, kappa 0.80): GPT-5 and Qwen Instruct refuse 83%
-  of this deliberately mild harmful subset; Qwen Base refuses 20%. The alignment gap
-  between a base model and its instruction-tuned sibling is the same gap part 1 found
-  under repetition.
-- **GPT-5 refused every ciphered cell it was asked**, including rot13 — the cipher it
-  demonstrably decodes (§3.1) and answers correctly for innocuous tasks. Refusal
-  survives the encoding. This is a one-model observation, and its labels come from a
-  judge that is itself GPT-5, so it is reported as an observation and not as a rate.
+The honest reading is an existence claim, not a rate. The confidence intervals
+include zero: with ten prompts, 0.067 is two prompts, and this design cannot estimate
+how often the bypass works. What it does establish is that **the bypass is real on a
+current frontier model**: refusal is not a property of the request's meaning alone,
+because the same meaning wrapped in letters→digits or in reversed text crossed a
+boundary it did not cross in plaintext. Note also which ciphers did *not* do it —
+rot13 and base64, the two the model decodes most fluently, and the keyed cipher it has
+to infer. Whatever is happening is not simply "harder to read means easier to bypass".
+
+Two further notes belong in the record. The gateway filter blocked 3 of GPT-5's
+ciphered cells outright (self-harm verdicts, §5.1), so defence in depth caught cells
+the model itself never saw. And the second judge could not score 3 of 19 batches at
+all: the Azure filter refused the judging request because it quotes harmful text.
+Evaluating this material has friction at every layer, including the evaluation layer.
 
 ## 6. Limitations
 

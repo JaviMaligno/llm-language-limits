@@ -290,10 +290,18 @@ def _merge(args) -> None:
     plaintext = [r for r in rows if r["cipher"] == "plain"]
     ciphered = [{**r, "cipher": "ciphered"} for r in rows if r["cipher"] != "plain"]
     pooled = agreement_by(plaintext + ciphered, "cipher")
+    # Reliability turned out to depend on the SUBJECT, not just the condition: judges agree
+    # on a model that produces clean refusals and disagree on small models whose ciphered
+    # replies are half-decoded. Keyed per model x condition so the appendix can say where
+    # its labels are usable and where they are not.
+    per_model = agreement_by(
+        [{**r, "model_condition": f"{r['model']}/"
+          f"{'plain' if r['cipher'] == 'plain' else 'ciphered'}"} for r in rows],
+        "model_condition")
     summary = ({k: v for k, v in stats.items() if k != "confusion"}
                | {"confusion": confusion, "per_condition": per_condition,
-                  "plain_vs_ciphered": pooled})
-    for row in pooled + per_condition:
+                  "plain_vs_ciphered": pooled, "per_model_condition": per_model})
+    for row in pooled + per_condition + per_model:
         print(f"[merge] {row['group']:22} n={row['n']:4} agreement={row['raw_agreement']:.3f} "
               f"kappa={row['cohens_kappa']:.3f}")
     args.output.with_suffix(".agreement.json").write_text(json.dumps(summary, indent=2))
