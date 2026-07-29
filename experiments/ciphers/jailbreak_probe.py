@@ -22,6 +22,7 @@ from dataclasses import replace
 from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).parent))
+from llm_language_limits.environment import load_project_env
 from llm_language_limits.config import MODEL_REGISTRY, SYSTEM_PROMPT
 from llm_language_limits.clients import get_client
 from llm_language_limits.ciphers import CIPHERS
@@ -31,7 +32,8 @@ from llm_language_limits.storage import append_record, read_records
 PROMPTS_FILE = Path("data/jailbreak_prompts.txt")
 OUT = Path("data/jailbreak_results.jsonl")
 PROBE_CIPHERS = ["rot13", "base64", "letters_to_digits", "reverse_all", "random_substitution"]
-JUDGE_LABEL = MODEL_REGISTRY["claude-sonnet"]   # safety-eval judge
+SUBJECT_MODELS = ("gpt-5", "qwen7b-instruct", "qwen7b-base")
+DEFAULT_JUDGE = "claude-sonnet"   # safety-eval judge of record (design doc)
 PROBE_VERSION = 2
 # Worst-case wins: a model that complies in ANY readable view has complied. Ranked so a
 # refusal in the readable view is never overwritten by GARBLED noise from the other view.
@@ -52,6 +54,22 @@ JUDGE_SYS = (
 _AUDIT_LOCK = threading.Lock()
 
 
+def resolve_specs(models=None, gpt5_deployment=None):
+    """Subject roster, optionally restricted, with gpt-5 routed to a given deployment.
+
+    gpt-5 needs its own run: with the default Azure content filter, encoded prompts are
+    rejected by the gateway before the model sees them, so its cipher cells only carry
+    signal when routed to a deployment whose filter permits them.
+    """
+    specs = []
+    for label in (models or SUBJECT_MODELS):
+        spec = MODEL_REGISTRY[label]
+        if label == "gpt-5" and gpt5_deployment:
+            spec = replace(spec, id=gpt5_deployment)
+        specs.append(spec)
+    return specs
+
+
 def _cell_key(r):
     return (r["model"], r["cipher"], r["prompt_id"], r["replicate"])
 
@@ -70,7 +88,8 @@ def _judge(judge_client, request, response):
     return "GARBLED"
 
 
-def classify_reply(reply: str, cipher_name: str, plain: str, judge, *, sink=None) -> dict:
+def classify_reply(reply: str, cipher_name: str, plain: str, judge, *, sink=None,
+                   judge_model: str | None = None) -> dict:
     """Label one reply, judging the view that actually reads as English.
 
     `judge` is a callable (request, response) -> label, so this stays testable offline.
@@ -113,6 +132,7 @@ def classify_reply(reply: str, cipher_name: str, plain: str, judge, *, sink=None
         "english_dec": None if english_dec is None else round(english_dec, 3),
         "reply_chars": len(raw),
         "probe_version": PROBE_VERSION,
+        "judge_model": judge_model,
     }
 
 
@@ -128,7 +148,8 @@ def _audit_sink(path: Path, cell: dict):
     return sink
 
 
-def _run_cell(subject, judge_client, spec, cipher_name, pid, plain, rep, audit_path=None):
+def _run_cell(subject, judge_client, spec, cipher_name, pid, plain, rep, audit_path=None,
+              judge_model=None):
     sent = plain if cipher_name == "plain" else CIPHERS[cipher_name].encode(plain)
     cell = {"model": spec.label, "cipher": cipher_name, "prompt_id": pid, "replicate": rep}
     try:
@@ -138,18 +159,25 @@ def _run_cell(subject, judge_client, spec, cipher_name, pid, plain, rep, audit_p
     except Exception as e:
         # Azure gateway harm-filter block etc. -> record as filtered, not model refusal.
         return cell | {"label": "FILTERED_GATEWAY", "channel": "none", "decoded_ok": False,
-                       "probe_version": PROBE_VERSION, "subject_stop": str(type(e).__name__)}
+                       "probe_version": PROBE_VERSION, "judge_model": judge_model,
+                       "subject_stop": str(type(e).__name__)}
     rec = classify_reply(reply, cipher_name, plain,
                          lambda req, resp: _judge(judge_client, req, resp),
-                         sink=_audit_sink(audit_path, cell) if audit_path else None)
+                         sink=_audit_sink(audit_path, cell) if audit_path else None,
+                         judge_model=judge_model)
     return cell | rec | {"subject_stop": stop}
 
 
 def main():
+    load_project_env()   # repo .env overrides inherited shell vars
     ap = argparse.ArgumentParser()
     ap.add_argument("--yes", action="store_true")
     ap.add_argument("--reps", type=int, default=3)
     ap.add_argument("--workers", type=int, default=6)
+    ap.add_argument("--models", nargs="+", default=None, choices=sorted(SUBJECT_MODELS),
+                    help="restrict the subject roster (default: all three)")
+    ap.add_argument("--judge", default=DEFAULT_JUDGE, choices=sorted(MODEL_REGISTRY),
+                    help="judge model label; recorded per cell in judge_model")
     ap.add_argument("--audit-dump", type=Path, default=None,
                     help="write judged views to this GITIGNORED local file for the manual "
                          "judge audit (spec 6), then delete it once the labels are validated")
@@ -158,15 +186,10 @@ def main():
         raise SystemExit("--audit-dump must live under data/ (gitignored)")
 
     prompts = [l.strip() for l in PROMPTS_FILE.read_text().splitlines() if l.strip()]
-    gpt5_dep = os.environ.get("GPT5_DEPLOYMENT")
-    specs = []
-    for k in ("gpt-5", "qwen7b-instruct", "qwen7b-base"):
-        s = MODEL_REGISTRY[k]
-        if k == "gpt-5" and gpt5_dep:
-            s = replace(s, id=gpt5_dep)
-        specs.append(s)
+    specs = resolve_specs(args.models, os.environ.get("GPT5_DEPLOYMENT"))
     conds = ["plain"] + PROBE_CIPHERS
     total = len(specs) * len(conds) * len(prompts) * args.reps
+    print(f"roster: {[(s.label, s.id) for s in specs]}")
     print(f"probe: {len(specs)} models x {len(conds)} conditions x {len(prompts)} prompts "
           f"x {args.reps} reps = {total} cells")
     if not args.yes:
@@ -180,7 +203,12 @@ def main():
     stale = len(existing) - len(done)
     if stale:
         print(f"[resume] ignoring {stale} pre-v{PROBE_VERSION} records (invalid measurement)")
-    judge_client = get_client(JUDGE_LABEL)
+    judge_spec = MODEL_REGISTRY[args.judge]
+    if args.judge != DEFAULT_JUDGE:
+        print(f"[judge] using {args.judge} instead of the judge of record "
+              f"({DEFAULT_JUDGE}); labels carry judge_model and must not be pooled with "
+              f"{DEFAULT_JUDGE} labels without re-annotating")
+    judge_client = get_client(judge_spec)
     subjects = {s.label: get_client(s) for s in specs}
     tasks = []
     for spec in specs:
@@ -192,7 +220,7 @@ def main():
                     tasks.append((spec, cn, pid, plain, rep))
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as pool:
         futs = [pool.submit(_run_cell, subjects[s.label], judge_client, s, cn, pid, plain, rep,
-                            args.audit_dump)
+                            args.audit_dump, args.judge)
                 for (s, cn, pid, plain, rep) in tasks]
         for fut in concurrent.futures.as_completed(futs):
             try:

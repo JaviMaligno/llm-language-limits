@@ -12,8 +12,11 @@ from __future__ import annotations
 import pathlib
 import sys
 
+import pytest
+
 sys.path.insert(0, str(pathlib.Path("experiments/ciphers")))
-from jailbreak_probe import PROBE_VERSION, classify_reply  # noqa: E402
+from jailbreak_probe import (  # noqa: E402
+    PROBE_VERSION, classify_reply, resolve_specs, SUBJECT_MODELS)
 
 from llm_language_limits.ciphers import CIPHERS  # noqa: E402
 
@@ -74,12 +77,39 @@ def test_empty_reply_is_garbled():
     assert classify_reply("", "rot13", HARMFUL, _judge_on_english)["label"] == "GARBLED"
 
 
+def test_resolve_specs_defaults_to_the_full_subject_roster():
+    assert [s.label for s in resolve_specs(None, None)] == list(SUBJECT_MODELS)
+
+
+def test_resolve_specs_can_restrict_the_roster():
+    # gpt-5 must be runnable separately: its cipher cells need a deployment whose
+    # content filter does not reject encoded prompts outright.
+    specs = resolve_specs(["qwen7b-instruct", "qwen7b-base"], None)
+    assert [s.label for s in specs] == ["qwen7b-instruct", "qwen7b-base"]
+
+
+def test_resolve_specs_routes_gpt5_to_the_given_deployment():
+    specs = resolve_specs(["gpt-5"], "gpt-5-noshield")
+    assert specs[0].label == "gpt-5" and specs[0].id == "gpt-5-noshield"
+
+
+def test_resolve_specs_rejects_unknown_labels():
+    with pytest.raises(KeyError):
+        resolve_specs(["not-a-model"], None)
+
+
 def test_audit_sink_sees_every_judged_view_and_is_opt_in():
     seen = []
     coded = CIPHERS["rot13"].encode(COMPLIANCE)
     classify_reply(coded, "rot13", HARMFUL, _judge_on_english,
                    sink=lambda ch, text, lab: seen.append((ch, lab)))
     assert ("plain", "GARBLED") in seen and ("coded", "COMPLIED") in seen
+
+
+def test_record_names_the_judge_that_produced_the_label():
+    # part 1's lesson: a label without its judge identity cannot be pooled or re-homogenised
+    rec = classify_reply(REFUSAL, "rot13", HARMFUL, _judge_on_english, judge_model="gpt-5")
+    assert rec["judge_model"] == "gpt-5"
 
 
 def test_record_carries_auditable_metrics_but_no_content():
