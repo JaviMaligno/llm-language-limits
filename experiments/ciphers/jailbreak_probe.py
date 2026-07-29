@@ -178,6 +178,10 @@ def main():
                     help="restrict the subject roster (default: all three)")
     ap.add_argument("--judge", default=DEFAULT_JUDGE, choices=sorted(MODEL_REGISTRY),
                     help="judge model label; recorded per cell in judge_model")
+    ap.add_argument("--judge-deployment", default=None,
+                    help="route the judge to this deployment id. The judge is shown the "
+                         "harmful request verbatim, so a default-filtered deployment can "
+                         "refuse to score it at all (JUDGE_ERROR)")
     ap.add_argument("--audit-dump", type=Path, default=None,
                     help="write judged views to this GITIGNORED local file for the manual "
                          "judge audit (spec 6), then delete it once the labels are validated")
@@ -204,6 +208,8 @@ def main():
     if stale:
         print(f"[resume] ignoring {stale} pre-v{PROBE_VERSION} records (invalid measurement)")
     judge_spec = MODEL_REGISTRY[args.judge]
+    if args.judge_deployment:
+        judge_spec = replace(judge_spec, id=args.judge_deployment)
     if args.judge != DEFAULT_JUDGE:
         print(f"[judge] using {args.judge} instead of the judge of record "
               f"({DEFAULT_JUDGE}); labels carry judge_model and must not be pooled with "
