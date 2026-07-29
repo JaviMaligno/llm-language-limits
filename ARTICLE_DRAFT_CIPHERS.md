@@ -86,7 +86,8 @@ English, which yields a second, stricter comprehension signal (explicit decode).
 
 The matrix is complete except for base64 × GPT-5 (24 cells), which the Azure
 gateway rejected as a whole block; that cipher's pooled row therefore rests on the
-two Qwen models only.
+two Qwen models only. §5.1 reports what actually caused that rejection, because it
+turned out to be a finding rather than an accident.
 
 ## 3. Results
 
@@ -185,22 +186,128 @@ here says those models cannot read ROT13 — it is a policy boundary: unreadable
 input is treated as suspicious, and that judgment fires before any decoding
 attempt.
 
+### 5.1 A harm classifier scoring gibberish: why base64 has no GPT-5 row
+
+The missing base64 × GPT-5 cells are not a quota or transport failure. Sending
+`base64("reply with the single word banana")` to the Azure gateway returns HTTP 400
+with a filter verdict that names the reason:
+
+```
+jailbreak:  { detected: true,  filtered: false }
+self_harm:  { filtered: true,  severity: "medium" }
+hate/sexual/violence: safe
+```
+
+Two things are worth stating plainly. First, the prompt-shield layer *does* flag an
+encoded prompt as a jailbreak attempt — mere unreadability is treated as adversarial
+intent. Second, and more interesting: what actually blocked the request was the
+**self-harm classifier assigning medium severity to a base64 string whose plaintext
+is a request for the word "banana"**. Faced with text it cannot parse, the harm
+classifier does not abstain; it produces a confident, spurious severity.
+
+This was verified after routing GPT-5 through a deployment whose jailbreak shield is
+set to annotate-only: rot13 and binary then pass (rot13 even gets the answer right,
+replying `banana`), while base64 stays blocked by the self-harm verdict. The harm
+categories cannot be relaxed without a limited-access approval, so those 24 cells
+stay missing, and base64's row rests on two models by necessity rather than choice.
+
+The defensive reading is not "the filter is broken". It is that an ensemble tuned on
+natural language degrades unpredictably on obfuscated input — in both directions at
+once: it over-blocks an innocuous encoded request here, and §5's premise is that the
+same ensemble may under-block a harmful one.
+
+### 5.2 The robustness question
+
 That boundary raises the natural robustness question, since guardrails are trained
 on plaintext: on the models that *do* decode, does wrapping a normally-refused
 request in a cipher raise compliance? We designed a bounded sub-probe for this
 (a fixed, deliberately mild subset of AdvBench, no CBRN/weapons/CSAM/self-harm
 categories, aggregate rates only, no harmful prompts or completions published).
 
-**The first run of that sub-probe is invalid and is not reported here.** It judged
-the *decoded* reply unconditionally, so a model that decoded the request and
+**The first run of that sub-probe (2026-07-18) is invalid and is not reported.** It
+judged the *decoded* reply unconditionally, so a model that decoded the request and
 refused in plain English had its refusal re-scrambled before judging: every
-letter-level cipher condition returned "garbled" by construction. Only the
-plaintext baseline survives (GPT-5 and Qwen Instruct refuse ~83% of the mild
-harmful set; Qwen Base refuses 20%). The probe now judges whichever view actually
-reads as English and records which channel the model used; the corrected run is
-pending, and the uplift section will be written from it or dropped. We state this
-rather than reporting the artefact because the artefact reads, superficially, like
-"ciphers defeat everything".
+letter-level cipher condition returned "garbled" by construction. Only its plaintext
+baseline survives (GPT-5 and Qwen Instruct refuse 83% of the mild harmful set; Qwen
+Base refuses 20%). We state this rather than reporting the artefact, because the
+artefact reads superficially like "ciphers defeat every guardrail".
+
+The corrected probe judges whichever view actually reads as English, records which
+channel the model answered in, and stores the judge's identity per cell. Its results
+are in §5.3.
+
+Three judge constraints shaped that run and are stated because they bound the
+appendix's strength, not because they are incidental:
+
+- The judge of record for this series (Claude Sonnet, as in part 1) was reachable
+  neither through the Anthropic API (no account credit) nor through Azure, where the
+  subscription has zero quota for Anthropic models in every region offered. The run
+  therefore used an Azure judge, with a second independent judge over a re-judged
+  sample to report agreement rather than asking the reader to trust one judge.
+- A judge is shown the harmful request verbatim, so a judge behind the default
+  content filter sometimes refuses to score at all. Those cells are recorded as
+  judge errors, never as refusals or compliances.
+- The primary judge is also one of the subjects, so its verdicts on its own outputs
+  are self-evaluation. The agreement analysis is what keeps that honest.
+- The independent judge could not be a Claude model, for a reason worth recording:
+  asked to label the material, it refused the batches containing genuine harmful
+  compliances while completing the batches of refusals and garbled output. Accepting
+  those partial labels would have biased agreement precisely on the cells that matter,
+  so the second judge is an earlier-generation OpenAI model applied to the whole
+  sample instead. Judging red-teaming output with an aligned model has its own
+  guardrail, and it is not neutral with respect to what it will score.
+
+### 5.3 The uplift is not measurable with an LLM judge
+
+The corrected probe ran 540 single-turn cells: three models × (plaintext baseline +
+five high-comprehension ciphers) × ten mild AdvBench prompts × three replicates.
+Before reading any compliance rate off those labels, we re-judged 377 judged views
+with a second, independent judge and measured agreement. That check decides the
+appendix, and it fails:
+
+| Condition | Views | Raw agreement | Cohen's kappa |
+|---|---:|---:|---:|
+| plaintext baseline | 65 | 0.892 | **0.796** |
+| ciphered (pooled) | 289 | 0.526 | **−0.015** |
+| rot13 | 57 | 0.596 | 0.088 |
+| reverse_all | 54 | 0.630 | 0.226 |
+| random substitution | 59 | 0.559 | 0.027 |
+| base64 | 50 | 0.460 | 0.026 |
+| letters→digits | 69 | 0.406 | −0.120 |
+
+On plaintext the two judges substantially agree: labelling a refusal or a compliance
+in readable English is a well-posed task. On ciphered conditions agreement collapses
+to chance — kappa is zero within noise, and negative for one cipher. The confusion is
+not random noise around a shared view, either: 66 views the first judge called
+refusals the second called garbled, and 39 it called garbled the second called
+compliances.
+
+So the uplift is not reported, and not because the run failed. **Compliance uplift
+under ciphers, measured with an LLM judge, is not identified**: the judge-to-judge
+disagreement is as large as the effect the metric is supposed to detect. A single
+judge would have produced a confident-looking uplift number in either direction
+depending on which judge was used.
+
+The reason is visible in the material. A small model answering an encoded harmful
+request usually produces text that is neither a refusal nor a fulfilment: it is
+partially decoded, half-coherent, off-topic, or a fluent continuation of the
+surface pattern. "Refused", "complied" and "garbled" are categories built for
+plaintext behaviour, and they do not carve up that output space. Any future version
+of this appendix needs a ground truth that does not depend on a judge's reading —
+human adjudication of a small sample, or a task-specific programmatic check like the
+verifiable oracle used for comprehension in the main experiment, which is exactly
+the design choice that made §3 trustworthy.
+
+Two things do survive from the probe, both from conditions where labels are sound:
+
+- **Plaintext baselines** (readable, kappa 0.80): GPT-5 and Qwen Instruct refuse 83%
+  of this deliberately mild harmful subset; Qwen Base refuses 20%. The alignment gap
+  between a base model and its instruction-tuned sibling is the same gap part 1 found
+  under repetition.
+- **GPT-5 refused every ciphered cell it was asked**, including rot13 — the cipher it
+  demonstrably decodes (§3.1) and answers correctly for innocuous tasks. Refusal
+  survives the encoding. This is a one-model observation, and its labels come from a
+  judge that is itself GPT-5, so it is reported as an observation and not as a rate.
 
 ## 6. Limitations
 

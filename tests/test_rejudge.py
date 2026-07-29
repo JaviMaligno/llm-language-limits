@@ -76,6 +76,38 @@ def test_parse_labels_rejects_unknown_labels_and_missing_cases():
         rejudge.parse_labels('{"1": "REFUSED"}', batch)
 
 
+def test_judge_batches_fills_only_missing_replies(tmp_path):
+    for index in range(3):
+        (tmp_path / f"batch_{index:02d}.prompt.txt").write_text(f"prompt {index}")
+        (tmp_path / f"batch_{index:02d}.views.jsonl").write_text(json.dumps(_view(index)) + "\n")
+    (tmp_path / "batch_01.reply.txt").write_text('{"1": "REFUSED"}')
+    seen = []
+
+    def judge(text):
+        seen.append(text)
+        return '{"1": "GARBLED"}'
+
+    done = rejudge.judge_batches(tmp_path, judge)
+    assert done == ["batch_00", "batch_02"]           # batch_01 already had a reply
+    assert seen == ["prompt 0", "prompt 2"]
+    assert (tmp_path / "batch_01.reply.txt").read_text() == '{"1": "REFUSED"}'
+    assert (tmp_path / "batch_02.reply.txt").read_text() == '{"1": "GARBLED"}'
+
+
+def test_judge_batches_records_failures_without_stopping(tmp_path):
+    for index in range(2):
+        (tmp_path / f"batch_{index:02d}.prompt.txt").write_text(f"prompt {index}")
+
+    def flaky(text):
+        if text.endswith("0"):
+            raise RuntimeError("filtered")
+        return '{"1": "REFUSED"}'
+
+    done = rejudge.judge_batches(tmp_path, flaky)
+    assert done == ["batch_01"]
+    assert not (tmp_path / "batch_00.reply.txt").exists()
+
+
 def test_agreement_reports_raw_and_kappa():
     a = {"x": "REFUSED", "y": "COMPLIED", "z": "REFUSED", "w": "GARBLED"}
     b = {"x": "REFUSED", "y": "COMPLIED", "z": "GARBLED", "w": "GARBLED"}
@@ -84,6 +116,28 @@ def test_agreement_reports_raw_and_kappa():
     assert out["raw_agreement"] == pytest.approx(0.75)
     assert -1.0 <= out["cohens_kappa"] <= 1.0
     assert out["confusion"][("REFUSED", "GARBLED")] == 1
+
+
+def test_agreement_by_group_separates_conditions():
+    # The load-bearing comparison of the appendix: judges may agree on plaintext and
+    # disagree on ciphered text, which decides whether an uplift is measurable at all.
+    rows = [
+        {"cipher": "plain", "label_first": "REFUSED", "label_second": "REFUSED"},
+        {"cipher": "plain", "label_first": "COMPLIED", "label_second": "COMPLIED"},
+        {"cipher": "rot13", "label_first": "REFUSED", "label_second": "GARBLED"},
+        {"cipher": "rot13", "label_first": "GARBLED", "label_second": "COMPLIED"},
+    ]
+    out = {r["group"]: r for r in rejudge.agreement_by(rows, "cipher")}
+    assert out["plain"]["raw_agreement"] == pytest.approx(1.0)
+    assert out["rot13"]["raw_agreement"] == pytest.approx(0.0)
+    assert out["rot13"]["n"] == 2
+
+
+def test_agreement_by_group_drops_unscorable_first_labels():
+    rows = [{"cipher": "rot13", "label_first": "JUDGE_ERROR", "label_second": "COMPLIED"},
+            {"cipher": "rot13", "label_first": "REFUSED", "label_second": "REFUSED"}]
+    out = {r["group"]: r for r in rejudge.agreement_by(rows, "cipher")}
+    assert out["rot13"]["n"] == 1          # a judge error is not a disagreement
 
 
 def test_agreement_is_perfect_when_labels_match():

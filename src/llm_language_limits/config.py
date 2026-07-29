@@ -25,6 +25,9 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
     "gpt-5": ModelSpec("gpt-5.4", Provider.AZURE_OPENAI, "gpt-5"),
     "gpt-5-mini": ModelSpec("gpt-5.4-mini", Provider.AZURE_OPENAI, "gpt-5-mini"),
     "gpt-5-nano": ModelSpec("gpt-5-nano", Provider.AZURE_OPENAI, "gpt-5-nano"),
+    # Judge-only, and only for the jailbreak appendix: an earlier-generation model, so the
+    # second judge is not from the same family as the subject it is scoring.
+    "gpt-4o": ModelSpec("gpt-4o-2", Provider.AZURE_OPENAI, "gpt-4o"),
     "qwen7b-instruct": ModelSpec(
         "Qwen/Qwen2.5-7B-Instruct", Provider.MODAL, "qwen7b-instruct",
         exposes_hidden_states=True),
