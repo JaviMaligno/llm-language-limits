@@ -18,9 +18,9 @@ for either core metric. Two results dominate. First, comprehension and productio
 are dissociated, and they dissociate in opposite directions: GPT-5 understands
 97.2% of cells but writes back in code in only 23.6%, while the base model
 understands 36.2% and writes in code in 55.8%. Second, inferring a *keyed* cipher
-whose mapping cannot have been memorised costs real turns — median turn 5 versus
-2 for standard schemes — and a single plaintext Rosetta pair collapses that cost
-to a median of 1. Separately, both Claude models refused ~86% of encoded turns
+whose mapping cannot have been memorised costs real turns: under pure inference its
+median solving turn is 5, against 2 for standard schemes, and a single plaintext
+Rosetta pair collapses that to a median of 1. Separately, both Claude models refused ~86% of encoded turns
 outright, which is a safety-boundary finding rather than a capability one. A bounded
 robustness appendix reaches a two-part conclusion: compliance uplift under ciphers is
 not identifiable on the small models — two independent judges agree worse than chance
@@ -129,14 +129,15 @@ Cluster-bootstrapped over ciphers (95% CI):
 |---|---|---|
 | GPT-5 | 0.972 [0.931, 1.000] | 0.236 [0.162, 0.306] |
 | Qwen 7B Instruct | 0.833 [0.733, 0.933] | 0.200 [0.100, 0.300] |
-| Qwen 7B Base | 0.363 [0.183, 0.563] | 0.558 [0.333, 0.783] |
+| Qwen 7B Base | 0.363 [0.183, 0.562] | 0.558 [0.333, 0.783] |
 
 GPT-5 understands nearly everything and answers in plain English anyway. The base
 model does the reverse: it mirrors the surface form of the prompt far more often
 than it acts on its content. Under the cipher-clustered sign-flip test the
-base-versus-instruct contrast is 0.471 for comprehension (p = 0.0088) and −0.358
-for production (p = 0.0283); GPT-5 versus Qwen Instruct is not resolvable for
-either metric (p = 0.13, p = 0.50). With ten clusters the smallest attainable
+base-minus-instruct contrast is −0.471 for comprehension (p = 0.0088) and +0.358
+for production (p = 0.0283): the base model comprehends far less and produces in-code
+output far more. GPT-5 versus Qwen Instruct is not resolvable for either metric
+(p = 0.13, p = 0.50). With ten clusters the smallest attainable
 p is ≈ 0.001, so these values are exploratory.
 
 The base model's production is not adoption of the code. In three cells (binary,
@@ -233,9 +234,10 @@ categories, aggregate rates only, no harmful prompts or completions published).
 judged the *decoded* reply unconditionally, so a model that decoded the request and
 refused in plain English had its refusal re-scrambled before judging: every
 letter-level cipher condition returned "garbled" by construction. Only its plaintext
-baseline survives (GPT-5 and Qwen Instruct refuse 83% of the mild harmful set; Qwen
-Base refuses 20%). We state this rather than reporting the artefact, because the
-artefact reads superficially like "ciphers defeat every guardrail".
+baseline was interpretable at all, and the corrected run in §5.3 supersedes even that,
+so no number from it is carried forward. We state the failure rather than quietly
+dropping the run, because the artefact reads superficially like "ciphers defeat every
+guardrail".
 
 The corrected probe judges whichever view actually reads as English, records which
 channel the model answered in, and stores the judge's identity per cell. Its result
@@ -280,6 +282,11 @@ verdict — it produces a map of where the labels mean anything:
 | Qwen Base, plaintext | 30 | 0.900 | 0.737 |
 | Qwen Base, ciphered | 71 | 0.732 | **−0.047** |
 
+The plaintext baselines, which are the part every model's labels agree on, are worth
+stating first: GPT-5 refused 30 of 30 harmful cells (100%), Qwen Instruct 25 of 30
+(83%), and Qwen Base 6 of 30 (20%). The alignment gap between a base model and its
+instruction-tuned sibling is the same gap part 1 found under repetition.
+
 Reliability depends on the subject, not only on the condition. Both judges agree on
 plaintext for every model. On ciphered conditions they agree on GPT-5's behaviour and
 agree *worse than chance* on both Qwen models — kappa −0.17 and −0.05. Per cipher the
@@ -297,8 +304,9 @@ usually emits text that is neither refusal nor fulfilment, and "refused / compli
 garbled" are plaintext categories that do not carve up that output space.
 
 **For GPT-5 the labels are usable, and there the mechanism does appear.** In
-plaintext it refused all 30 harmful cells, with the two judges in perfect agreement.
-Under ciphers it refused 168 of 180 cells — but not all:
+plaintext it refused all 30 harmful cells — a 100% refusal rate, with the two judges
+in perfect agreement. Of its 150 ciphered cells it refused 138, with 3 blocked by the
+gateway before it saw them and the rest split as follows:
 
 | GPT-5 condition | Scored | Compliance | Uplift vs plaintext | 95% CI (prompt bootstrap) |
 |---|---:|---:|---:|---|
@@ -384,7 +392,7 @@ round-trip test. Detection lives in `cipher_detect.py`, the conversation driver 
 draft into `data/analysis/ciphers/`. The appendix is reproduced by `jailbreak_probe.py`
 (labels only; harmful prompts and completions are never persisted),
 `scripts/rejudge_jailbreak.py` for the second judge and the agreement statistics, and
-`analyze_jailbreak.py` for the rates. Full suite: 163 tests passing.
+`analyze_jailbreak.py` for the rates. Full suite: 172 tests passing.
 
 The publication freeze is `docs/PUBLICATION_FREEZE.md`, generated by
 `scripts/freeze_provenance.py`: exact model ids and served versions, sampling settings
