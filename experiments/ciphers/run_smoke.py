@@ -3,6 +3,7 @@
 from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).parent))
+from llm_language_limits.environment import load_project_env
 from llm_language_limits.clients import get_client
 from llm_language_limits.config import MODEL_REGISTRY
 from llm_language_limits.storage import read_records
@@ -12,6 +13,7 @@ OUT = Path("data/ciphers_smoke.jsonl")
 
 
 def main():
+    load_project_env()   # repo .env overrides inherited shell vars
     spec = MODEL_REGISTRY["gpt-5-nano"]
     run_sweep(get_client, [spec], ["rot13", "random_substitution"], ["pure"], 1,
               OUT, turn_cap=6, resume=False)

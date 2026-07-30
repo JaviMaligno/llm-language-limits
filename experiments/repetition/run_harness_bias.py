@@ -4,6 +4,7 @@ compare with the raw-API baseline. NOT part of the core dataset."""
 from __future__ import annotations
 import subprocess, json, time
 from pathlib import Path
+from llm_language_limits.environment import load_project_env
 from llm_language_limits.stimuli import load_stimuli
 from llm_language_limits.storage import append_record
 
@@ -19,6 +20,7 @@ def ask_harness(prompt: str) -> str:
 
 
 def main():
+    load_project_env()   # repo .env overrides inherited shell vars
     stim = next(s for s in load_stimuli(HERE / "stimuli.yaml")
                 if s.category == "greeting")
     for t in range(1, TURNS + 1):

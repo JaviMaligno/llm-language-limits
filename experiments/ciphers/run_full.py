@@ -13,6 +13,7 @@ from dataclasses import replace
 from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).parent))
+from llm_language_limits.environment import load_project_env
 from llm_language_limits.clients import get_client
 from llm_language_limits.storage import read_records
 from llm_language_limits.cost import print_estimate
@@ -34,6 +35,7 @@ def _resolve_specs():
 
 
 def main():
+    load_project_env()   # repo .env overrides inherited shell vars
     ap = argparse.ArgumentParser()
     ap.add_argument("--yes", action="store_true")
     args = ap.parse_args()
