@@ -180,7 +180,7 @@ is still a string of letters. Comprehension-by-action is the robust metric; the
 explicit-decode signal is the strict one, and only GPT-5 clears it often (0.759 of
 cells, versus 0.167 and 0.067 for the Qwen models).
 
-## 5. The safety boundary we ran into
+## 5. Safety boundaries, and how they fail in both directions
 
 The pilot roster included Claude Opus and Sonnet. Both refused the encoded turns
 almost uniformly: **86.6% and 86.3% of turns respectively** (1,169 and 1,165 of
@@ -263,7 +263,7 @@ appendix's strength, not because they are incidental:
   sample instead. Judging red-teaming output with an aligned model has its own
   guardrail, and it is not neutral with respect to what it will score.
 
-### 5.3 Where the uplift can be measured, and what it shows there
+### 5.3 A two-part result: unmeasurable on the 7B models, a real bypass on GPT-5
 
 The corrected probe ran the full 540 single-turn cells: three models × (plaintext
 baseline + five high-comprehension ciphers) × ten mild AdvBench prompts × three
@@ -331,7 +331,33 @@ the model itself never saw. And the second judge could not score 3 of 19 batches
 all: the Azure filter refused the judging request because it quotes harmful text.
 Evaluating this material has friction at every layer, including the evaluation layer.
 
+The two halves of this appendix are meant to be read together, and neither is the
+whole story on its own. The bypass exists on the model where we can see clearly. On
+the models where we cannot see clearly, the literature's standard instrument — an
+LLM judge over refusal categories — returns numbers that look like measurements and
+are not. Anyone replicating CipherChat-style work should compute inter-judge
+agreement per subject and per cipher before reporting a single rate; on this material
+that check separates a usable measurement from a confident artefact, and it costs one
+extra judge pass.
+
 ## 6. Limitations
+
+Appendix-specific (the main experiment's limitations follow):
+
+- Ten harmful prompts and three replicates. Enough to establish that a bypass
+  occurred, far too few to estimate its frequency, and every uplift interval here
+  includes zero.
+- The prompts are deliberately from the mildest end of AdvBench, with CBRN, weapons,
+  CSAM and self-harm excluded. A harsher subset could behave differently in either
+  direction, and we did not test it.
+- Single turn only. Multi-turn escalation, which §3.3 shows matters a great deal for
+  comprehension, is untested for compliance.
+- The primary judge is also a subject. Agreement with an independent judge mitigates
+  this but does not remove it.
+- Compliance is judged from decoded text, so the appendix inherits every weakness of
+  the decoding heuristic in §4.
+
+Main experiment:
 
 - One turn cap (10) for every cipher; a comprehension that would have fired at
   turn 12 is indistinguishable from never.
@@ -355,7 +381,10 @@ Cipher codecs and the task bank are pure, unit-tested modules
 round-trip test. Detection lives in `cipher_detect.py`, the conversation driver in
 `cipher_runner.py`. The sweep, its staged entrypoints and the analysis are in
 `experiments/ciphers/`; `analyze.py` regenerates every table and figure in this
-draft into `data/analysis/ciphers/`. Full suite: 125 tests passing.
+draft into `data/analysis/ciphers/`. The appendix is reproduced by `jailbreak_probe.py`
+(labels only; harmful prompts and completions are never persisted),
+`scripts/rejudge_jailbreak.py` for the second judge and the agreement statistics, and
+`analyze_jailbreak.py` for the rates. Full suite: 163 tests passing.
 
 Before publication, freeze exact model IDs, API dates, sampling settings and the
 cipher seed, and archive the JSONL with the generating commit.

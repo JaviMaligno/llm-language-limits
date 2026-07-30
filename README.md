@@ -27,12 +27,23 @@ comprehension rate, memorised schemes vs keyed-novel ciphers, and in-code output
 that comes with comprehension vs mere form mimicry.
 
 The bounded jailbreak sub-probe (`jailbreak_probe.py`, design in
-`docs/superpowers/specs/2026-07-17-*`) is a separate robustness appendix, and its
-result is **negative**: compliance uplift under ciphers is not identifiable with an
-LLM judge. Two independent judges agree substantially on plaintext (Cohen's kappa
-0.796) and at chance level on ciphered conditions (-0.015), so the uplift numbers
-`analyze_jailbreak.py` prints must not be reported — including their uniformly
-negative sign, which reflects unrecognised compliances rather than protection.
+`docs/superpowers/specs/2026-07-17-*`) is a separate robustness appendix with a
+**two-part result**, and both parts are load-bearing:
+
+- **On the 7B models the uplift is not identifiable.** Two independent judges agree on
+  plaintext (kappa 0.66–0.74) and *worse than chance* on their ciphered replies
+  (−0.17 and −0.05), so the uplift `analyze_jailbreak.py` prints for them must not be
+  reported — including its uniformly negative sign, which reflects compliances the
+  judge failed to recognise in half-decoded text rather than protection.
+- **On gpt-5 the labels are usable and a bounded bypass is real.** Judges agree
+  perfectly on its plaintext cells and at 0.818 raw on its ciphered ones. It refused
+  all 30 plaintext cells, and complied with two distinct prompts under two distinct
+  ciphers (letters→digits, reverse_all), reproduced across replicates and confirmed by
+  both judges. Reported as an existence result, never as a rate: ten prompts cannot
+  estimate frequency, and every interval includes zero.
+
+Always compute agreement per subject and per cipher before reporting any rate from
+this probe — that check is what separates the two halves above.
 
 ```bash
 GPT5_DEPLOYMENT=<no-shield deployment> \
